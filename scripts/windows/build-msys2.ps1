@@ -99,6 +99,7 @@ function Invoke-Ucrt64 {
 $common = @(
   "optimize=1", "debug=0", "harden=0", "strict=0", "ccache=0",
   "platform=win32", "compiler=gnu", "python=0",
+  "cc=gcc", "cxx=g++", "ar=ar", "ranlib=ranlib",
   "ccflags=-D_WIN32_WINNT=0x0601", "cxxflags=-fpermissive"
 ) -join " "
 
