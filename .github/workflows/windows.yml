@@ -67,12 +67,20 @@ jobs:
         run: |
           $installer = Get-Item .\dist\*-setup.exe
           $installDir = "C:\camotics-fast-installer-smoke"
-          & $installer.FullName /S "/D=$installDir"
+          $install = Start-Process -FilePath $installer.FullName `
+            -ArgumentList @("/S", "/D=$installDir") -PassThru -Wait
+          if ($install.ExitCode) {
+            throw "Silent installer failed with exit code $($install.ExitCode)"
+          }
           if (-not (Test-Path "$installDir\camsim.exe")) {
             throw "Silent install did not produce camsim.exe"
           }
           & "$installDir\camsim.exe" --version
-          & "$installDir\Uninstall.exe" /S
+          $uninstall = Start-Process -FilePath "$installDir\Uninstall.exe" `
+            -ArgumentList "/S" -PassThru -Wait
+          if ($uninstall.ExitCode) {
+            throw "Silent uninstaller failed with exit code $($uninstall.ExitCode)"
+          }
           if (Test-Path $installDir) { throw "Silent uninstall left files" }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
