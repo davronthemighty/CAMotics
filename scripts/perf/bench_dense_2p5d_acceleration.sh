@@ -16,6 +16,7 @@ resolution="$2"
 out_dir="$3"
 threads="$4"
 modes="${5:-optimized dexel dexel-production}"
+read -r -a mode_list <<< "$modes"
 mkdir -p "$out_dir"
 
 run_mode() {
@@ -29,7 +30,7 @@ run_mode() {
     > "$dir/run.log" 2> "$dir/time.log"
 }
 
-for mode in $modes; do
+for mode in "${mode_list[@]}"; do
   case "$mode" in
     legacy) run_mode legacy ;;
     optimized)
@@ -46,7 +47,7 @@ for mode in $modes; do
   esac
 done
 
-python3 - "$project" "$out_dir" $modes <<'PY'
+python3 - "$project" "$out_dir" "${mode_list[@]}" <<'PY'
 import json
 import pathlib
 import re

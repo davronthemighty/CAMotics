@@ -41,12 +41,16 @@ jobs:
       - name: Write checksums and build information
         run: |
           cd release-assets
-          sha256sum $(cat inventory.txt) >SHA256SUMS
+          mapfile -t artifacts <inventory.txt
+          sha256sum "${artifacts[@]}" >SHA256SUMS
           cd ..
+          mapfile -t release_artifacts < <(
+            sed 's#^#release-assets/#' release-assets/inventory.txt
+          )
           python3 scripts/release/write_buildinfo.py \
             --output release-assets/BUILDINFO.json \
             --tag "$GITHUB_REF_NAME" \
-            $(sed 's#^#release-assets/#' release-assets/inventory.txt)
+            "${release_artifacts[@]}"
       - id: provenance
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
