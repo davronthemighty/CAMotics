@@ -1,5 +1,23 @@
 # CAMotics Changelog
 
+## v2026.08.0
+
+- Added opt-in Z-dexel simulation with physical cylindrical, conical, and
+  snubnose cutter profiles and automatic full marching-cubes fallback.
+- Added retained Dexel checkpoints, exact partial-move playback, request
+  coalescing, stock display LOD, tool filtering, and live height maps.
+- Added exact-preserving ToolSweep spatial indices and stock-bounded lookup.
+- Added sparse toolpath surface extraction with analytic stock stitching,
+  ownership, topology validation, and adaptive region depth.
+- Added topology-checked planar mesh reduction with deviation limits,
+  rejection accounting, and whole-candidate rollback.
+- Added multicore cancellation and deterministic cross-thread contracts for
+  the accelerated simulation paths.
+- Added the Carvera Air visualization profile, reference-frame controls,
+  persistent status reporting, Tool Table recovery, and trackpad navigation.
+- Added public geometry contracts, benchmarks, portable packaging, and Linux
+  and Windows release workflows.
+
 ## v1.3.0:
  - Multi-language support.
  - German language translation. (Joël Plüss)

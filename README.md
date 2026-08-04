@@ -1,113 +1,107 @@
-![CAMotics Logo][1]
+# CAMotics Fast
 
-CAMotics is an Open-Source software which can simulate 3-axis NC
-machining. It is a fast, flexible and user-friendly simulation
-software for the DIY and Open-Source community.  CAMotics works on
-Linux, OS-X and Windows.
+![CAMotics logo](images/camotics-logo.png)
 
-At home manufacturing is one of the next big technology revolutions. Much like
-the PC was 30 years ago. There have been major advances in desktop 3D printing
-yet uptake of desktop CNCs has lagged despite the availability of ​cheap CNC
-machines. One of the major reasons for this is a lack of Open-Source simulation
-and CAM (3D model to tool path conversion) software. CAM and NC machine
-simulation present some very difficult programming problems, as is evidenced by
-30+ years of academic papers on these topics. Whereas, 3D printing simulation
-and tool path generation are much easier. Such software is essential to using a
-CNC.
+CAMotics Fast is a performance-focused fork of
+[CAMotics](https://github.com/CauldronDevelopmentLLC/CAMotics), the open-source
+3-axis G-code simulator created by Joseph Coffland and its contributors.  It
+keeps CAMotics' full marching-cubes simulator as the correctness reference and
+adds faster paths for the jobs that can be handled without changing the
+meaning of the cut.
 
-Being able to simulate is a critical part of creating CNC tool
-paths. Programming a CNC without a simulator is cutting without
-measuring; it's both dangerous and expensive. With CAMotics you can
-preview the results of your cutting operation before you fire up your
-machine. This will save you time and money and open up a world of
-creative possibilities by allowing you to rapidly visualize and
-improve upon designs without wasting material or breaking tools.
+Accuracy comes before speed.  Every accelerated backend has explicit
+eligibility checks, reports why it was rejected, and falls back to full
+marching cubes when its assumptions do not hold.
 
-See http://camotics.org/
+## Status
 
-# Buildbotics Open-Source CNC Controller
-![Buildbotics CNC](https://buildbotics.com/upload/controller_in_hand.gif)
+| Feature | Status | Notes |
+| --- | --- | --- |
+| Full marching cubes | Stable reference | Default CLI backend and fallback |
+| ToolSweep spatial index | Stable | Exact candidate pruning; no geometry change |
+| Z-dexel simulation | Experimental | Fast 2.5D cutting for supported 3-axis jobs |
+| Sparse surface extraction | Experimental | Marches toolpath-adjacent regions and stitches analytic stock |
+| Safe mesh reduction | Advanced opt-in | Applies only after deviation and topology checks |
+| Checkpointed GUI playback | Experimental | Exact retained Dexel replay with coalesced display updates |
+| Live Dexel height map | Experimental | 8-bit grayscale view and CLI PNG export |
 
-You might also be interested in the Buildbotics CNC controller.  Check it out
-at https://buildbotics.com/.  Buildbotics purchases help support CAMotics.
+## Downloads
 
-# License
-GNU General Public License version 2+.  See the file ``COPYING``.
+Stable Windows and Linux builds are attached to the
+[latest release](https://github.com/davronthemighty/CAMotics/releases/latest).
+Windows executables are not code-signed and may trigger a SmartScreen warning.
 
-# Downloads
-Packages for Windows, Linux and OSX can be found on the
-[CAMotics Website](http://camotics.org/download.html).
+Release files include a portable Windows ZIP, a Windows installer, a Linux
+AppImage, a Debian package, checksums, and build information.  The Debian
+package is named `camotics-fast` and deliberately conflicts with the upstream
+`camotics` package because both install the same commands and desktop files.
 
-# Building from Source
-This section describes how to build CAMotics from source on Debian based
-systems such as Ubuntu and Mint Linux.  If you are running Windows or OSX
-it is much easier to simply install prebuilt packages which can be found
-at http://camotics.org/download.html  There are also prebuilt Debian packages
-you can try.
+## Quick build
 
-## Prerequisites
-  - C!         - http://cbang.org/
-  - Qt5        - http://qt-project.org/
-  - SCons      - http://www.scons.org/
-  - v8         - https://developers.google.com/v8/
+The normal public build omits the legacy TPL/V8 subsystem:
 
-On Debian based systems all the prerequisites, including those needed
-by C!, can be installed with the following command line:
+```sh
+git clone https://github.com/davronthemighty/CAMotics.git
+cd CAMotics
+git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+git -C build-deps/cbang checkout 62bd9aa11938236ac3f1568e8bfdeaa160c14eac
+scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+CBANG_HOME="$PWD/build-deps/cbang" scons -j"$(nproc)" with_tpl=0
+./camsim --version
+```
 
-    sudo apt-get update
-    sudo apt-get -y install scons build-essential libqt5websockets5-dev \
-      libqt5opengl5-dev qttools5-dev-tools libnode-dev libglu1-mesa-dev \
-      pkgconf git
+See [BUILDING.md](BUILDING.md) for Linux, WSL, headless, GUI, and MSYS2
+instructions.
 
-## Building C! (cbang)
-Clone the C! git repository, build the software using scons and set the
-environment variable CBANG_HOME so the CAMotics build system can find it
-later.  **You must install V8 before this step.**
+## Using the accelerated paths
 
-    git clone https://github.com/CauldronDevelopmentLLC/cbang.git
-    scons -C cbang
-    export CBANG_HOME=$PWD/cbang
+Run the full reference simulation in the usual way:
 
-## Building CAMotics
-Clone the CAMotics git repository and build the software using scons:
+```sh
+./camsim --threads 16 project.camotics result.stl
+```
 
-    git clone https://github.com/CauldronDevelopmentLLC/CAMotics.git
-    cd CAMotics
-    scons
+Try the Dexel backend, retaining automatic fallback:
 
-## Building & Installing the Debian Package
-In the CAMotics source code directory run:
+```sh
+./camsim --dexel --threads 16 --profile run.json \
+  project.camotics result.stl
+```
 
-    scons package
-    sudo dpkg -i camotics_*.deb
+Inspect a job before rendering:
 
-## Build Warnings/Errors
-If you get any build warnings, by default, the build will stop.  If you have
-problems building, especially with warnings related to the boost library you
-can ignore these warnings by building cbang and/or CAMotics with
-`scons strict=0`.  This disables strict checking.  For example:
+```sh
+./camsim --perf-advice project.camotics
+./camsim --dexel-eligibility-only --profile eligibility.json project.camotics
+```
 
-    scons -C cbang strict=0
-    cd CAMotics
-    scons strict=0
+The accelerated options and their limits are documented in:
 
-# Using CAMotics
-If you've installed the Debian package you should find CAMotics in your menu
-under Other.  Also you can simply run `camotics` on the command line.
+- [Accelerated simulation](ACCELERATED_SIMULATION.md)
+- [Dexel simulation](DEXEL_SIMULATION.md)
+- [Sparse surface extraction](SPARSE_SURFACE_EXTRACTION.md)
+- [Safe mesh reduction](SAFE_MESH_REDUCTION.md)
+- [GUI playback](GUI_PLAYBACK.md)
+- [Benchmarks and reproducibility](BENCHMARKS.md)
 
-If you did not install the package, open a command line, go to the directory
-where you built CAMotics and run `./camotics`
+## Important limits
 
-# Try the Examples
-Try out some of the examples in CAMotics's File -> Examples menu.
+- CAMotics is a stock-removal preview, not a machine-dynamics or collision
+  certification system.
+- The Dexel backend is a single-height 2.5D model.  It cannot represent
+  undercuts, caves, or separate vertical intervals in one XY column.
+- Rotary and auxiliary-axis motion is rejected by Dexel simulation.
+- Machine profiles describe geometry, travel, and published operating limits;
+  they do not model backlash, runout, flex, servo following error, or cutting
+  forces.
+- Simulation is not a substitute for reviewing G-code, workholding, tools,
+  feeds, limits, and clearance on the real machine.
 
-## No Icons in Menus on Linux
-If you don't see icons in CAMotics menus on Linux try running the following
-command and restarting CAMotics:
+## Project lineage and license
 
-    gconftool-2 --type boolean --set /desktop/gnome/interface/menus_have_icons true
+CAMotics Fast is distributed under the GNU General Public License, version 2
+or later.  See [COPYING](COPYING).  Existing CAMotics copyrights and
+attribution are retained; new fork code is also attributed to
+`davronthemighty` in its source headers.
 
-# Sponsors
-<img src="https://uploads-ssl.webflow.com/5ac3c046c82724970fc60918/5c019d917bba312af7553b49_MacStadium-developerlogo.png" alt="MacStadium Logo" width="200"/>
-
-[1]: https://raw.githubusercontent.com/CauldronDevelopmentLLC/CAMotics/master/images/camotics-logo.png
+AI-assisted development tools were used during this work. The released code and documentation were reviewed and validated by the maintainer.
