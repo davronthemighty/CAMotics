@@ -16,7 +16,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      - id: msys2
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
         with:
           msystem: UCRT64
           update: true
@@ -41,10 +42,13 @@ jobs:
         run: choco install nsis --version=3.11 --yes --no-progress
       - name: Locate MSYS2
         shell: powershell
+        env:
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
         run: |
-          $bash = (Get-Command bash.exe).Source
-          $root = Split-Path (Split-Path (Split-Path $bash))
-          "MSYS2_ROOT=$root" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          $bash = Join-Path $env:MSYS2_LOCATION "usr\bin\bash.exe"
+          if (-not (Test-Path $bash)) { throw "MSYS2 bash is missing: $bash" }
+          "MSYS2_ROOT=$env:MSYS2_LOCATION" |
+            Out-File -Append -Encoding utf8 $env:GITHUB_ENV
       - name: Build and deploy native bundle
         shell: powershell
         run: |

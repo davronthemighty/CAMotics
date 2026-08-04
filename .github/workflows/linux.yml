@@ -192,13 +192,15 @@ jobs:
           deb_name="$(basename "$deb")"
           dpkg-deb --info "$deb"
           dpkg-deb --contents "$deb" | grep -q '/usr/bin/camsim$'
-          docker run --rm -e DEB_NAME="$deb_name" -v "$PWD:/src:ro" \
+          docker run --rm -e DEB_NAME="$deb_name" \
+            -e DEBIAN_FRONTEND=noninteractive -e TZ=Etc/UTC \
+            -v "$PWD:/src:ro" \
             ubuntu:24.04 bash -euxc '
             apt-get update
             apt-get install -y "/src/dist/$DEB_NAME" xvfb
             camsim --version
             camsim --dexel --no-export /src/examples/slant_test/slant_test.camotics
-            QT_QPA_PLATFORM=offscreen xvfb-run -a camotics \
+            LIBGL_ALWAYS_SOFTWARE=1 timeout 120s xvfb-run -a camotics \
               --simulation-backend auto-dexel --auto-close-after-simulation \
               /src/examples/slant_test/slant_test.camotics
           '
