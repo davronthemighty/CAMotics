@@ -1,0 +1,212 @@
+name: Linux
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CBANG_COMMIT: 62bd9aa11938236ac3f1568e8bfdeaa160c14eac
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git scons pkg-config python3-dev xvfb \
+            qtbase5-dev libqt5opengl5-dev libqt5websockets5-dev \
+            qttools5-dev-tools libgl1-mesa-dev libglu1-mesa-dev \
+            zlib1g-dev libbz2-dev liblz4-dev libexpat1-dev libevent-dev \
+            libre2-dev libsqlite3-dev libyaml-dev
+      - name: Build pinned Cbang
+        run: |
+          git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+          git -C build-deps/cbang checkout "$CBANG_COMMIT"
+          scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+      - name: Build CAMotics Fast
+        env:
+          CBANG_HOME: ${{ github.workspace }}/build-deps/cbang
+        run: scons -j"$(nproc)" with_gui=1 with_tpl=0
+      - name: Run geometry and backend contracts
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          bash scripts/perf/smoke_original_headless_tests.sh ./camsim
+          bash scripts/perf/smoke_partition_cross_thread.sh ./camsim
+          bash scripts/perf/smoke_safe_reduce_contract_cxx.sh ./camsim
+          bash scripts/perf/smoke_dexel_simulation.sh ./camsim
+          bash scripts/perf/smoke_surface_task_contract.sh ./camsim
+          bash scripts/perf/smoke_sparse_toolpath_pipeline.sh
+          xvfb-run -a bash scripts/perf/smoke_gui_simulation_acceleration.sh \
+            ./camotics ./camsim
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git scons pkg-config python3-dev \
+            zlib1g-dev libbz2-dev liblz4-dev libexpat1-dev libevent-dev \
+            libre2-dev libsqlite3-dev libyaml-dev
+      - name: Build pinned Cbang
+        run: |
+          git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+          git -C build-deps/cbang checkout "$CBANG_COMMIT"
+          scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+      - name: Address and undefined behavior smoke
+        env:
+          CBANG_HOME: ${{ github.workspace }}/build-deps/cbang
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          scons -j"$(nproc)" camsim camsim-path camsim-region-plan \
+            camsim-boundary-plan camsim-render-regions camsim-stitch-stock \
+            camsim-reduce-export camsim-dexel-state \
+            with_gui=0 with_tpl=0 optimize=0 debug=1 \
+            ccflags="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            linkflags="-fsanitize=address,undefined"
+          bash scripts/perf/smoke_safe_reduce_contract_cxx.sh ./camsim
+          bash scripts/perf/smoke_dexel_state_contract.sh ./camsim-dexel-state
+          bash scripts/perf/smoke_sparse_toolpath_pipeline.sh
+
+  thread-sanitizer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git scons pkg-config python3-dev \
+            zlib1g-dev libbz2-dev liblz4-dev libexpat1-dev libevent-dev \
+            libre2-dev libsqlite3-dev libyaml-dev
+      - name: Build pinned Cbang
+        run: |
+          git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+          git -C build-deps/cbang checkout "$CBANG_COMMIT"
+          scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+      - name: Thread sanitizer contracts
+        env:
+          CBANG_HOME: ${{ github.workspace }}/build-deps/cbang
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: |
+          scons -j"$(nproc)" camsim camsim-dexel-state \
+            with_gui=0 with_tpl=0 optimize=0 debug=1 \
+            ccflags="-fsanitize=thread -fno-omit-frame-pointer" \
+            linkflags="-fsanitize=thread"
+          bash scripts/perf/smoke_partition_cross_thread.sh ./camsim
+          bash scripts/perf/smoke_dexel_state_contract.sh ./camsim-dexel-state
+
+  coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git scons pkg-config python3-dev python3-pip \
+            zlib1g-dev libbz2-dev liblz4-dev libexpat1-dev libevent-dev \
+            libre2-dev libsqlite3-dev libyaml-dev
+          python3 -m pip install --user --break-system-packages gcovr==8.3
+      - name: Build pinned Cbang
+        run: |
+          git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+          git -C build-deps/cbang checkout "$CBANG_COMMIT"
+          scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+      - name: Run covered backend and fallback suite
+        env:
+          CBANG_HOME: ${{ github.workspace }}/build-deps/cbang
+        run: |
+          scons -j"$(nproc)" camsim camsim-path camsim-region-plan \
+            camsim-boundary-plan camsim-render-regions camsim-stitch-stock \
+            camsim-reduce-export camsim-dexel-state gcodetool \
+            with_gui=0 with_tpl=0 optimize=0 debug=1 \
+            ccflags="--coverage -fno-omit-frame-pointer" \
+            linkflags="--coverage"
+          CAMOTICS_SMOKE_CXXFLAGS=--coverage \
+          CAMOTICS_SMOKE_LDFLAGS=--coverage \
+            bash scripts/perf/smoke_productized_options.sh ./camsim
+          python3 -m gcovr --root . --filter src --exclude cbang \
+            --gcov-ignore-parse-errors negative_hits.warn_once_per_file \
+            --xml coverage.xml --print-summary
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: error
+
+  packages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build and package dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git scons pkg-config python3-dev \
+            qtbase5-dev libqt5opengl5-dev libqt5websockets5-dev \
+            qttools5-dev-tools libgl1-mesa-dev libglu1-mesa-dev \
+            zlib1g-dev libbz2-dev liblz4-dev libexpat1-dev libevent-dev \
+            libre2-dev libsqlite3-dev libyaml-dev \
+            squashfs-tools libfuse2 debhelper devscripts fakeroot xvfb
+      - name: Build pinned Cbang
+        run: |
+          git clone https://github.com/CauldronDevelopmentLLC/cbang.git build-deps/cbang
+          git -C build-deps/cbang checkout "$CBANG_COMMIT"
+          scons -C build-deps/cbang -j"$(nproc)" with_openssl=0
+      - name: Build Linux packages
+        env:
+          CBANG_HOME: ${{ github.workspace }}/build-deps/cbang
+        run: scripts/release/build-linux-packages.sh
+      - name: Validate AppImage
+        run: |
+          appimage="$(find dist -name '*.AppImage' -print -quit)"
+          chmod +x "$appimage"
+          "$appimage" --appimage-extract >/dev/null
+          squashfs-root/usr/bin/camsim --version
+          QT_QPA_PLATFORM=offscreen xvfb-run -a \
+            "$appimage" --appimage-extract-and-run \
+            --simulation-backend auto-dexel --auto-close-after-simulation \
+            examples/slant_test/slant_test.camotics
+      - name: Validate Debian package
+        run: |
+          deb="$(find dist -name '*.deb' -print -quit)"
+          deb_name="$(basename "$deb")"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | grep -q '/usr/bin/camsim$'
+          docker run --rm -e DEB_NAME="$deb_name" -v "$PWD:/src:ro" \
+            ubuntu:24.04 bash -euxc '
+            apt-get update
+            apt-get install -y "/src/dist/$DEB_NAME" xvfb
+            camsim --version
+            camsim --dexel --no-export /src/examples/slant_test/slant_test.camotics
+            QT_QPA_PLATFORM=offscreen xvfb-run -a camotics \
+              --simulation-backend auto-dexel --auto-close-after-simulation \
+              /src/examples/slant_test/slant_test.camotics
+          '
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-release
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/SHA256SUMS.linux
+          if-no-files-found: error

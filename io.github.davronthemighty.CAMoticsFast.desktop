@@ -1,10 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=CAMotics
+Name=CAMotics Fast
 Exec=camotics %f
 Terminal=false
-Categories=Science
-Comment=Open-Source Simulation & Computer Aided Machining
+Categories=Science;
+Keywords=CNC;CAM;G-code;simulation;machining;
+Comment=3-axis G-code simulation and stock-removal preview
 Icon=camotics
 StartupNotify=true
 MimeType=application/x-camotics-project;application/x-camotics-nc;

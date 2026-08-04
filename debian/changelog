@@ -1,5 +1,7 @@
-camotics (0.0.1) UNRELEASED; urgency=low
+camotics-fast (2026.8.0-1) stable; urgency=medium
 
-  * Initial release (Closes: #949344).
+  * Publish the first CAMotics Fast release.
+  * Add accelerated simulation, validated mesh reduction, and retained GUI
+    playback while preserving full marching cubes as the reference fallback.
 
- -- Joseph Coffland <joseph@cauldrondevelopment.com>  Thu, 13 Jan 2011 20:38:52 -0800
+ -- davronthemighty <davronthemighty@users.noreply.github.com>  Mon, 03 Aug 2026 00:00:00 -0600

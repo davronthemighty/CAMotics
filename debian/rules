@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 export DH_VERBOSE = 1
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+NUMJOBS = $(or $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS))),1)
 
 # link to libatomic on armel and mipsel
 ifneq (,$(filter $(DEB_HOST_ARCH), armel mipsel))
@@ -10,7 +10,7 @@ endif
 
 include /usr/share/dpkg/default.mk  # provides DEB_VERSION
 
-SCONS_OPTIONS = cycles=0 mode=release sharedlib=1 -j8 werror=0 clang=1
+SCONS_OPTIONS = cycles=0 mode=release sharedlib=1 werror=0 with_tpl=0
 
 %:
 	dh $@
@@ -28,4 +28,8 @@ override_dh_usrlocal:
 	true
 
 override_dh_auto_install:
-	PREFIX=/usr scons prefix=debian/camotics/usr $(SCONS_OPTIONS) install
+	scons install_prefix=debian/camotics-fast/usr $(SCONS_OPTIONS) install
+	install -d debian/camotics-fast/usr/share/doc/camotics-fast
+	mv debian/camotics-fast/usr/share/doc/camotics/examples \
+	  debian/camotics-fast/usr/share/doc/camotics-fast/
+	rm -rf debian/camotics-fast/usr/share/doc/camotics

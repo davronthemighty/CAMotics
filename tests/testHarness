@@ -50,7 +50,11 @@ import sqlite3
 import copy
 import operator
 import json
-from six import string_types
+
+try:
+  from six import string_types
+except ImportError:
+  string_types = (str,)
 
 try:
   from io import StringIO

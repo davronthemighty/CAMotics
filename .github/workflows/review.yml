@@ -1,0 +1,48 @@
+name: Repository review
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  text-and-workflows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install review tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          python3 -m pip install --user codespell==2.4.1
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - name: Shell and workflow checks
+        run: |
+          find scripts -type f \( -name '*.sh' -o -name 'build-appimage' \) \
+            -print0 | xargs -0 shellcheck
+          "$(go env GOPATH)/bin/actionlint"
+      - name: Spelling
+        run: |
+          mapfile -t files < <(git diff --diff-filter=ACMR --name-only \
+            e84665f2...HEAD | grep -E '\.(cpp|h|py|sh|ps1|md)$')
+          codespell --ignore-words-list=lod,normaly,fro,te "${files[@]}"
+      - name: Markdown style
+        run: |
+          npx --yes markdownlint-cli2@0.20.0 \
+            README.md BUILDING.md ACCELERATED_SIMULATION.md \
+            DEXEL_SIMULATION.md SPARSE_SURFACE_EXTRACTION.md \
+            SAFE_MESH_REDUCTION.md GUI_PLAYBACK.md BENCHMARKS.md \
+            RELEASE_NOTES.md
+      - name: Links
+        run: |
+          for file in README.md BUILDING.md ACCELERATED_SIMULATION.md \
+            DEXEL_SIMULATION.md SPARSE_SURFACE_EXTRACTION.md \
+            SAFE_MESH_REDUCTION.md GUI_PLAYBACK.md BENCHMARKS.md; do
+            npx --yes markdown-link-check@3.13.7 --quiet \
+              --config .markdown-link-check.json "$file"
+          done

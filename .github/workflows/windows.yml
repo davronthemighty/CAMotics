@@ -1,0 +1,84 @@
+name: Windows
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build-package-test:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git scons make zip
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-scons
+            mingw-w64-ucrt-x86_64-qt5-base
+            mingw-w64-ucrt-x86_64-qt5-tools
+            mingw-w64-ucrt-x86_64-qt5-websockets
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-bzip2
+            mingw-w64-ucrt-x86_64-lz4
+            mingw-w64-ucrt-x86_64-expat
+            mingw-w64-ucrt-x86_64-libevent
+            mingw-w64-ucrt-x86_64-re2
+            mingw-w64-ucrt-x86_64-sqlite3
+            mingw-w64-ucrt-x86_64-libyaml
+      - name: Install pinned NSIS
+        shell: powershell
+        run: choco install nsis --version=3.11 --yes --no-progress
+      - name: Locate MSYS2
+        shell: powershell
+        run: |
+          $bash = (Get-Command bash.exe).Source
+          $root = Split-Path (Split-Path (Split-Path $bash))
+          "MSYS2_ROOT=$root" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Build and deploy native bundle
+        shell: powershell
+        run: |
+          .\scripts\windows\build-msys2.ps1 -Jobs $env:NUMBER_OF_PROCESSORS `
+            -Msys2Root $env:MSYS2_ROOT -BundleDir build\windows-bundle
+      - name: Build portable ZIP and installer
+        shell: powershell
+        run: |
+          .\scripts\windows\build-release.ps1 `
+            -BundleDir build\windows-bundle -Msys2Root $env:MSYS2_ROOT
+      - name: Packaged CLI and compact simulation smoke
+        shell: powershell
+        run: |
+          & .\build\windows-bundle\camsim.exe --version
+          & .\build\windows-bundle\camsim.exe --dexel --no-export `
+            .\examples\slant_test\slant_test.camotics
+          if ($LASTEXITCODE) { throw "Packaged CAMSIM smoke failed" }
+      - name: Silent installer and uninstaller smoke
+        shell: powershell
+        run: |
+          $installer = Get-Item .\dist\*-setup.exe
+          $installDir = "C:\camotics-fast-installer-smoke"
+          & $installer.FullName /S "/D=$installDir"
+          if (-not (Test-Path "$installDir\camsim.exe")) {
+            throw "Silent install did not produce camsim.exe"
+          }
+          & "$installDir\camsim.exe" --version
+          & "$installDir\Uninstall.exe" /S
+          if (Test-Path $installDir) { throw "Silent uninstall left files" }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-release
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
+            dist/SHA256SUMS.windows
+          if-no-files-found: error

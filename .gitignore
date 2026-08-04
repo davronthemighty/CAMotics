@@ -44,6 +44,7 @@ moc_*.cc
 /gcodetool
 /camprobe
 /camsim
+/camsim-*
 /camopt
 /planner
 /tco2stl

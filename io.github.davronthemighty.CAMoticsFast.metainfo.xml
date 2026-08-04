@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.davronthemighty.CAMoticsFast</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>CAMotics Fast</name>
+  <summary>3-axis G-code simulation and stock-removal preview</summary>
+  <description>
+    <p>
+      CAMotics Fast simulates 3-axis CNC programs and previews the resulting
+      stock. It retains CAMotics' full marching-cubes simulator as a reference
+      while adding faster backends for supported 2.5D work.
+    </p>
+    <p>
+      Dexel simulation, sparse surface extraction, validated mesh reduction,
+      and retained playback checkpoints are available where their eligibility
+      checks pass. Unsupported jobs fall back to the reference simulator.
+    </p>
+  </description>
+  <developer id="io.github.davronthemighty">
+    <name>davronthemighty</name>
+  </developer>
+  <url type="homepage">https://github.com/davronthemighty/CAMotics</url>
+  <url type="bugtracker">https://github.com/davronthemighty/CAMotics/issues</url>
+  <launchable type="desktop-id">io.github.davronthemighty.CAMoticsFast.desktop</launchable>
+  <releases>
+    <release version="2026.8.0" date="2026-08-03" />
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

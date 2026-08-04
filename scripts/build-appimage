@@ -1,36 +1,55 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+set -euo pipefail
 
-ROOT="$(dirname "$(dirname "$(readlink -f "$0")")")"
-DEST="$ROOT/build/AppImage"
-QT_PLUGINS="platforms imageformats iconengines platformthemes xcbglintegrations"
-QT_PLUGINS+=" platforminputcontexts"
-RUNTIME="https://github.com/AppImage/AppImageKit"
-RUNTIME+="/releases/download/continuous/runtime-x86_64"
-VERSION=$(grep version package.json | sed 's/.*: "\([^"]*\).*/\1/')
-APPIMAGE="$ROOT/CAMotics-$VERSION-x86_64.AppImage"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+appdir="$root/build/AppDir"
+tool_dir="${XDG_CACHE_HOME:-$HOME/.cache}/camotics-fast-release"
+tool="$tool_dir/appimagetool-x86_64.AppImage"
+tool_url="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+# AppImage/appimagetool 8c8c91f762b412a19f4e8d2c4b35afb98f2d7c81,
+# continuous asset published 2025-12-04.
+tool_sha256="a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0"
 
-# Install CAMotics
-scons install install_prefix="$DEST/usr"
+version="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$root/package.json")"
+IFS=. read -r year month patch <<<"$version"
+release_tag="${RELEASE_TAG:-$(printf 'v%04d.%02d.%d' "$year" "$month" "$patch")}"
+output="${APPIMAGE_OUTPUT:-$root/dist/CAMotics-Fast-$release_tag-linux-x86_64.AppImage}"
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$root" show -s --format=%ct HEAD)}"
+export ARCH=x86_64
 
-# Install AppImage files
-install "$ROOT/scripts/AppRun" "$DEST"
-install "$ROOT/CAMotics.desktop" "$DEST"
-install "$ROOT/images/camotics.png" "$DEST/.DirIcon"
+mkdir -p "$tool_dir" "$(dirname "$output")"
+if [[ ! -f "$tool" ]] || ! echo "$tool_sha256  $tool" | sha256sum -c -; then
+  rm -f "$tool"
+  curl --fail --location --retry 3 --output "$tool" "$tool_url"
+fi
+echo "$tool_sha256  $tool" | sha256sum -c -
+chmod +x "$tool"
 
-# Install Qt5 plugins
-LIBS=
-for NAME in $QT_PLUGINS; do
-  LIBS+=" /usr/lib/x86_64-linux-gnu/qt5/plugins/$NAME/*.so"
+rm -rf "$appdir"
+mkdir -p "$appdir"
+scons -j"${JOBS:-$(nproc)}" install install_prefix="$appdir/usr" \
+  with_gui=1 with_tpl=0
+install -m 0755 "$root/scripts/AppRun" "$appdir/AppRun"
+desktop="io.github.davronthemighty.CAMoticsFast.desktop"
+install -m 0644 "$root/$desktop" "$appdir/$desktop"
+install -m 0644 "$root/images/camotics.png" "$appdir/.DirIcon"
+install -m 0644 "$root/images/camotics.png" "$appdir/camotics.png"
+
+qt_plugins=(
+  platforms imageformats iconengines platformthemes xcbglintegrations
+  platforminputcontexts
+)
+plugin_files=()
+for name in "${qt_plugins[@]}"; do
+  for file in /usr/lib/x86_64-linux-gnu/qt5/plugins/"$name"/*.so; do
+    [[ -e "$file" ]] && plugin_files+=("$file")
+  done
 done
+"$root/scripts/find-libs" -r -I "$appdir" "${plugin_files[@]}"
+"$root/scripts/find-libs" -I "$appdir" "$appdir"/usr/bin/*
 
-# Install libraries
-"$ROOT/scripts/find-libs" -r -I "$DEST" $LIBS
-"$ROOT/scripts/find-libs" -I "$DEST" "$DEST"/usr/bin/*
-
-# Build AppImage
-mksquashfs "$DEST" "$ROOT/build/sqashfs" -root-owned -noappend
-curl -L "$RUNTIME" > "$APPIMAGE"
-cat "$ROOT/build/sqashfs" >> "$APPIMAGE"
-chmod +x "$APPIMAGE"
-
-echo "Built $APPIMAGE"
+find "$appdir" -print0 | xargs -0 touch -h -d "@$SOURCE_DATE_EPOCH"
+APPIMAGE_EXTRACT_AND_RUN=1 "$tool" "$appdir" "$output"
+chmod +x "$output"
+echo "Built $output"

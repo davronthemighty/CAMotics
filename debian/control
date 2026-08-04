@@ -1,16 +1,23 @@
-Source: camotics
-Maintainer: Joseph Coffland <joseph@cauldrondevelopment.com>
+Source: camotics-fast
+Maintainer: davronthemighty <davronthemighty@users.noreply.github.com>
 Section: science
 Priority: optional
 Standards-Version: 4.7.0
-Homepage: https://camotics.org/
-Build-Depends: debhelper-compat (= 13), scons, libcbang0-dev
+Homepage: https://github.com/davronthemighty/CAMotics
+Build-Depends: debhelper-compat (= 13), build-essential, scons, pkg-config,
+ python3-dev, qtbase5-dev, libqt5opengl5-dev, libqt5websockets5-dev,
+ qttools5-dev-tools, libgl1-mesa-dev, libglu1-mesa-dev, zlib1g-dev,
+ libbz2-dev, liblz4-dev, libexpat1-dev, libevent-dev, libre2-dev,
+ libsqlite3-dev, libyaml-dev
+Rules-Requires-Root: no
 
-Package: camotics
+Package: camotics-fast
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: 3-axis numerical control machining simulator
- CAMotics is an Open-Source software which can simulate 3-axis NC
- machining. It is a fast, flexible and user-friendly simulation
- software for the DIY and Open-Source community.  CAMotics works on
- Linux, OS-X and Windows.
+Provides: camotics
+Conflicts: camotics
+Replaces: camotics
+Description: accelerated 3-axis numerical control machining simulator
+ CAMotics Fast is a performance-focused fork of the CAMotics 3-axis G-code
+ simulator. It retains full marching cubes as a reference and fallback while
+ adding opt-in Dexel, sparse extraction, safe reduction, and faster playback.
