@@ -9,7 +9,11 @@ with open('package.json', 'r') as f: pkg_meta = json.load(f)
 version = pkg_meta['version']
 
 # Setup
-env = Environment(ENV = os.environ,
+# Native Windows SCons prefers MSVC when it is installed.  Select the complete
+# MinGW tool set before configuration so linker and archiver actions agree with
+# the requested compiler.
+tools = ['mingw'] if int(ARGUMENTS.get('cross_mingw', 0)) else None
+env = Environment(ENV = os.environ, tools = tools,
                   TARGET_ARCH = os.environ.get('TARGET_ARCH', 'x86'))
 Export('env')
 env.Tool('config', toolpath = [cbang])
