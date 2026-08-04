@@ -64,7 +64,9 @@ namespace CAMotics {
     cb::SmartPointer<GCode::ToolPath> path;
     std::ostringstream gcode;
 
+#ifndef CAMOTICS_NO_TPL
     cb::SmartPointer<tplang::TPLContext> tplCtx;
+#endif
 
   public:
     ToolPathTask(const Project::Project &project,

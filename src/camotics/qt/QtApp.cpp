@@ -24,6 +24,7 @@
 #include "QApplication.h"
 
 #include <cbang/Info.h>
+#include <cbang/String.h>
 #include <cbang/log/Logger.h>
 #include <cbang/os/SystemInfo.h>
 
@@ -47,6 +48,37 @@ QtApp::QtApp() :
   options.add("play-speed", "Set playback speed.")->setDefault(1);
   options.add("auto-close", "Automatically exit after tool path playback is "
               "complete.  Only valid with 'auto-play'")
+    ->setDefault(false);
+  options.add("auto-close-after-simulation", "Automatically exit after the "
+              "initial simulation finishes.  Intended for GUI testing.")
+    ->setDefault(false);
+  options.add("simulation-backend", "Override the GUI simulation backend: "
+              "full-mc or auto-dexel.");
+  options.add("simulation-output", "Write the completed GUI simulation to a "
+              "binary STL path.  Intended for GUI testing.");
+  options.add("simulation-seek-ratios", "After the initial GUI simulation, "
+              "seek through comma-separated timeline ratios.  Intended for "
+              "GUI testing.");
+  options.add("simulation-seek-burst-ratios", "After the initial GUI "
+              "simulation, inject comma-separated timeline ratios before "
+              "the next task is scheduled.  Intended for coalescing tests.");
+  options.add("simulation-go-to-end", "After test seeks, invoke the GUI End "
+              "action and publish the exact final state.")
+    ->setDefault(false);
+  options.add("disable-tools", "Comma-separated tool numbers excluded from "
+              "GUI stock removal.  Intended for GUI testing.");
+  options.add("machine", "Initial machine profile override.");
+  options.add("view-frame", "Initial GUI reference frame: stock or tool.");
+  options.add("test-view-controls", "Exercise Space, precision-trackpad "
+              "navigation, tool-table population, and dock recovery.  "
+              "Intended for GUI testing.")
+    ->setDefault(false);
+  options.add("test-dexel-grid-window", "Open and verify the current Dexel "
+              "height-map window after simulation.  Intended for GUI "
+              "testing.")
+    ->setDefault(false);
+  options.add("validate-dexel-topology", "Run the diagnostic topology scan "
+              "after every accepted GUI dexel simulation.")
     ->setDefault(false);
   options.addTarget("threads", threads, "GCode::Number of simulation threads.");
 
@@ -73,6 +105,18 @@ int QtApp::init(int argc, char *argv[]) {
 
   int ret = Application::init(argc, argv);
   if (ret < 0) return ret;
+
+  // Rendering attributes must be selected before the first Qt application
+  // object is constructed.  init() creates a temporary QGuiApplication to
+  // query the primary screen before run() creates the QApplication.
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
+#ifdef _WIN32
+  // MSYS2 Qt uses native Windows OpenGL and does not ship ANGLE's
+  // libGLESv2.dll.
+  QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL);
+#else
+  QCoreApplication::setAttribute(Qt::AA_UseOpenGLES);
+#endif
 
   QGuiApplication guiApp(argc, argv);
   QScreen *screen = guiApp.primaryScreen();
@@ -103,8 +147,6 @@ void QtApp::run() {
   string org = Info::instance().get(getName(), "Org");
   QCoreApplication::setOrganizationName(QString::fromUtf8(org.c_str()));
   QCoreApplication::setApplicationName(QString::fromUtf8(getName().c_str()));
-  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
-  QCoreApplication::setAttribute(Qt::AA_UseOpenGLES);
 
   int argc = args.size();
   QApplication qtApp(argc, (char **)&args[0]);
@@ -120,11 +162,36 @@ void QtApp::run() {
   else qtWin.openProject(projectFile);
 
   qtWin.getView().setSpeed(options["play-speed"].toInteger());
+  if (options["machine"].hasValue())
+    qtWin.loadMachine(options["machine"].toString());
+  if (options["view-frame"].hasValue()) {
+    string frame = String::toLower(options["view-frame"].toString());
+    if (frame == "stock") qtWin.setReferenceFrame(View::STOCK_FRAME);
+    else if (frame == "tool") qtWin.setReferenceFrame(View::TOOL_FRAME);
+    else LOG_WARNING("Unknown GUI view frame '" << frame
+                     << "'; using stock");
+  }
+
+  if (options["disable-tools"].hasValue()) {
+    string values = options["disable-tools"].toString();
+    size_t begin = 0;
+    while (begin < values.size()) {
+      size_t end = values.find(',', begin);
+      string value = values.substr(begin, end - begin);
+      if (value.empty()) THROW("GUI disabled tool number cannot be empty");
+      qtWin.setSimulationToolEnabled(String::parseU32(value), false);
+      if (end == string::npos) break;
+      begin = end + 1;
+    }
+  }
 
   if (options["auto-play"].toBoolean()) {
     qtWin.setAutoPlay();
     if (options["auto-close"].toBoolean()) qtWin.setAutoClose();
   }
+
+  if (options["auto-close-after-simulation"].toBoolean())
+    qtWin.setAutoCloseAfterSimulation();
 
   // Start it up
   qtWin.show();

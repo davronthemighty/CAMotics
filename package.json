@@ -1,19 +1,20 @@
 {
-  "name": "CAMotics",
-  "description": "A 3-axis GCode simulator.",
-  "homepage": "https://camotics.org/",
-  "version": "1.3.0",
+  "name": "CAMotics Fast",
+  "description": "A 3-axis G-code simulator with accelerated stock removal.",
+  "homepage": "https://github.com/davronthemighty/CAMotics",
+  "version": "2026.8.0",
   "license": "GPL-2.0+",
   "author": {
-    "name": "Joseph Coffland",
-    "email": "joseph@camotics.org"
+    "name": "davronthemighty",
+    "email": "davronthemighty@users.noreply.github.com"
   },
+  "contributors": [
+    {
+      "name": "Joseph Coffland"
+    }
+  ],
   "bugs": {
-    "url": "https://github.com/CauldronDevelopmentLLC/CAMotics/issues"
-  },
-  "funding": {
-    "type" : "individual",
-    "url" : "https://camotics.org/donate"
+    "url": "https://github.com/davronthemighty/CAMotics/issues"
   },
   "bin": {
     "camotics":  "./camotics",
@@ -24,6 +25,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/CauldronDevelopmentLLC/CAMotics"
+    "url": "https://github.com/davronthemighty/CAMotics"
   }
 }

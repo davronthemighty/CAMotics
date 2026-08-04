@@ -20,6 +20,8 @@
 
 #include "GridTreeLeaf.h"
 
+#include <camotics/Profile.h>
+
 using namespace std;
 using namespace cb;
 using namespace CAMotics;
@@ -31,12 +33,43 @@ void GridTreeLeaf::add(const Triangle &t) {
 }
 
 
-void GridTreeLeaf::gather(vector<float> &vertices,
-                          vector<float> &normals) const {
-  for (unsigned i = 0; i < getCount(); i++)
+void GridTreeLeaf::add(const Triangle &t,
+                       const ContourTriangleProvenance &provenance) {
+  if (!t.normal.isReal()) return; // Degenerate, skip
+
+  if (Profile::isEnabled() || shouldCaptureContourProvenance()) {
+    if (this->provenance.empty() && !triangles.empty())
+      this->provenance.resize(triangles.size());
+    this->provenance.push_back(provenance);
+  }
+
+  triangles.push_back(t);
+}
+
+
+void GridTreeLeaf::translateProvenance(const Vector3U &offset) {
+  if (provenance.empty()) return;
+
+  for (auto &entry: provenance)
+    entry.cell += offset;
+}
+
+
+void GridTreeLeaf::gather(vector<float> &vertices, vector<float> &normals,
+                          vector<ContourTriangleProvenance> *provenance)
+  const {
+  bool hasProvenance = provenance && this->provenance.size() == getCount();
+
+  for (unsigned i = 0; i < getCount(); i++) {
     for (unsigned j = 0; j < 3; j++)
       for (unsigned k = 0; k < 3; k++) {
         vertices.push_back(triangles[i][j][k]);
         normals.push_back(triangles[i].normal[k]);
       }
+
+    if (provenance)
+      provenance->push_back(hasProvenance ?
+                            this->provenance[i] :
+                            ContourTriangleProvenance());
+  }
 }

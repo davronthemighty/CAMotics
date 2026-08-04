@@ -22,27 +22,51 @@
 
 
 #include <camotics/Task.h>
+#include <camotics/sim/DexelSimulation.h>
 
 #include <cbang/SmartPointer.h>
+
+#include <cstdint>
 
 
 namespace CAMotics {
   class Simulation;
   class SimulationRun;
   class Surface;
-
-
   class SurfaceTask : public Task {
     cb::SmartPointer<SimulationRun> simRun;
     cb::SmartPointer<Surface> surface;
+    SimulationBackend backend = SimulationBackend::FULL_MC;
+    bool dexelAttempted = false;
+    bool fallback = false;
+    Dexel::RejectionReason fallbackReason = Dexel::RejectionReason::NONE;
+    bool targetTimeSet = false;
+    double targetTime = 0;
+    uint64_t generation = 0;
+    bool retainDexelState = false;
+    bool buildDexelBoundary = true;
+    bool retainDexelGrid = false;
 
   public:
     SurfaceTask(const Simulation &sim);
+    SurfaceTask(const Simulation &sim, bool retainDexelState,
+                bool buildDexelBoundary = true,
+                bool retainDexelGrid = false);
     SurfaceTask(const cb::SmartPointer<SimulationRun> &simRun);
+    SurfaceTask(const cb::SmartPointer<SimulationRun> &simRun,
+                double targetTime, uint64_t generation,
+                bool buildDexelBoundary = true);
     ~SurfaceTask();
 
     const cb::SmartPointer<SimulationRun> &getSimRun() const {return simRun;}
     const cb::SmartPointer<Surface> &getSurface() const {return surface;}
+    SimulationBackend getBackend() const {return backend;}
+    bool wasDexelAttempted() const {return dexelAttempted;}
+    bool hasFallbackReason() const {return fallback;}
+    Dexel::RejectionReason getFallbackReason() const {return fallbackReason;}
+    bool hasTargetTime() const {return targetTimeSet;}
+    double getTargetTime() const {return targetTime;}
+    uint64_t getGeneration() const {return generation;}
 
     // From Task
     void run() override;

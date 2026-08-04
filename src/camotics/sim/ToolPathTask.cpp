@@ -24,8 +24,10 @@
 #include <camotics/project/Project.h>
 #include <camotics/sim/Simulation.h>
 
+#ifndef CAMOTICS_NO_TPL
 #include <tplang/TPLContext.h>
 #include <tplang/Interpreter.h>
+#endif
 
 #include <gcode/interp/Interpreter.h>
 
@@ -197,5 +199,7 @@ void ToolPathTask::run() {
 
 void ToolPathTask::interrupt() {
   Task::interrupt();
+#ifndef CAMOTICS_NO_TPL
   if (tplCtx.isSet()) tplCtx->interrupt();
+#endif
 }

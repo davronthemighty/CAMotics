@@ -21,6 +21,8 @@
 #include "SliceContourGenerator.h"
 #include "TriangleSurface.h"
 
+#include <camotics/Profile.h>
+
 using namespace cb;
 using namespace CAMotics;
 
@@ -51,7 +53,18 @@ void SliceContourGenerator::run(FieldFunction &func, GridTreeRef &grid) {
       for (unsigned x = 0; x < steps.x(); x++) {
         p.x() = grid.getOffset().x() + resolution * x;
 
-        if (!func.cull(p, resolution * 1.1)) doCell(grid, slice, x, y);
+        cellsVisited++;
+        Profile::count(ProfileCounter::CELLS_VISITED);
+
+        if (!func.cull(p, resolution * 1.1)) {
+          cellsContoured++;
+          Profile::count(ProfileCounter::CELLS_CONTOURED);
+          doCell(grid, slice, x, y);
+
+        } else {
+          cellsCulled++;
+          Profile::count(ProfileCounter::CELLS_CULLED);
+        }
 
         // Progress
         if ((++completedCells & 7) == 0 &&

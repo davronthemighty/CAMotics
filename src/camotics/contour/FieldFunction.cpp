@@ -20,6 +20,8 @@
 
 #include "FieldFunction.h"
 
+#include <camotics/Profile.h>
+
 #include <cbang/Exception.h>
 
 #include <cmath>
@@ -39,6 +41,8 @@ Vector3D FieldFunction::linearIntersect(Vector3D &a, double &aDepth,
   // Binary search for intersection point
   for (unsigned i = 0; i < 8; i++) {
     mid = a + (b - a) * 0.5;
+    Profile::count(ProfileCounter::LINEAR_INTERSECT_ITERATIONS);
+    Profile::count(ProfileCounter::DEPTH_CALLS);
     double midDepth = depth(mid);
 
     if ((midDepth < 0) == (aDepth < 0)) {

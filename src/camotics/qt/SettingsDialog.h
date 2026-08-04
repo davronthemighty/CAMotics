@@ -25,6 +25,7 @@
 #include "ui_settings_dialog.h"
 
 #include <camotics/project/Project.h>
+#include <camotics/sim/Simulation.h>
 #include <camotics/view/View.h>
 
 #include <gcode/plan/PlannerConfig.h>
@@ -57,6 +58,8 @@ namespace CAMotics {
 
     bool getPlannerEnabled() const;
     void setPlannerEnabled(bool enabled);
+
+    SimulationBackendPolicy getSimulationBackendPolicy() const;
 
     void loadPlanVec(const std::string &widget, const std::string &var,
                      GCode::Axes &vec, double scale = 1);

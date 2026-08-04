@@ -21,8 +21,11 @@
 #include "CorrectedMC33.h"
 #include "CorrectedMC33Cube.h"
 
+#include "ContourProvenance.h"
 #include "CubeSlice.h"
 #include "GridTreeLeaf.h"
+
+#include <camotics/Profile.h>
 
 using namespace CAMotics;
 using namespace cb;
@@ -63,15 +66,31 @@ void CorrectedMC33::doCell(GridTreeRef &tree, const CubeSlice &slice,
   // Draw the triangles that were found.  There can be up to five per cube.
   centerComputed = false;
   for (unsigned i = 0; i < count; i++) {
+    bool hasCenterVertex = false;
+    ContourTriangleProvenance provenance;
+    provenance.algorithm = ContourTriangleProvenance::MC33;
+    provenance.cell = offset;
+
     for (unsigned j = 0; j < 3; j++) {
       uint8_t edge = tiling[j + i * 3];
 
-      if (edge == 12) t[j] = getCenter(index);
-      else t[j] = edges[edge].vertex;
+      if (edge == 12) {
+        t[j] = getCenter(index);
+        hasCenterVertex = true;
+        provenance.vertices[j] = ContourVertexProvenance::cellCenter();
+
+      } else {
+        t[j] = edges[edge].vertex;
+        provenance.vertices[j] = ContourVertexProvenance::gridEdge(edge);
+      }
     }
 
     t.updateNormal();
-    leaf->add(t);
+    leaf->add(t, provenance);
+    triangles++;
+    Profile::count(hasCenterVertex ?
+                   ProfileCounter::CONTOUR_CELL_CENTER_TRIANGLES :
+                   ProfileCounter::CONTOUR_GRID_EDGE_TRIANGLES);
   }
 
   tree.insertLeaf(leaf.adopt(), offset);

@@ -20,6 +20,8 @@
 
 #include "AABB.h"
 
+#include <camotics/Profile.h>
+
 #include <algorithm>
 
 using namespace std;
@@ -115,8 +117,12 @@ bool AABB::intersects(const Rectangle3D &r) {
 
 void AABB::collisions(const Vector3D &p,
                       vector<const GCode::Move *> &moves) {
+  Profile::count(ProfileCounter::AABB_NODE_VISITS);
   if (!Rectangle3D::contains(p)) return;
-  if (isLeaf()) moves.push_back(move);
+  if (isLeaf()) {
+    Profile::count(ProfileCounter::AABB_LEAF_HITS);
+    moves.push_back(move);
+  }
   if (left) left->collisions(p, moves);
   if (right) right->collisions(p, moves);
 }

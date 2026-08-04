@@ -31,7 +31,8 @@ conf = env.CBConfigure()
 # Config vars
 env.Replace(PACKAGE_VERSION   = version)
 env.Replace(PACKAGE_AUTHOR    = '%(name)s <%(email)s>' % pkg_meta['author'])
-env.Replace(PACKAGE_COPYRIGHT = '2011-2022, Joseph Coffland')
+env.Replace(PACKAGE_COPYRIGHT =
+            '2011-2026, Joseph Coffland; 2026, davronthemighty')
 env.Replace(PACKAGE_HOMEPAGE  = pkg_meta['homepage'])
 env.Replace(PACKAGE_ORG       = 'Cauldron Development')
 env.Replace(PACKAGE_LICENSE   = 'https://www.gnu.org/licenses/gpl-2.0.txt')
@@ -72,6 +73,10 @@ if not env.GetOption('clean'):
 
     conf.CBConfig('cbang')
     env.CBDefine('USING_CBANG') # Using CBANG macro namespace
+    if env['PLATFORM'] == 'win32' or int(env.get('cross_mingw', 0)):
+        # Cbang's Windows SystemInfo implementation uses
+        # GetAdaptersAddresses(), which is provided by iphlpapi.
+        conf.CBCheckLib('iphlpapi')
     for lib in 'mariadbclient snappy leveldb yaml sqlite3'.split():
         if lib in env['LIBS']: env['LIBS'].remove(lib)
 
@@ -120,6 +125,11 @@ if not env.GetOption('clean'):
         env.CBDefine(['CBANG_WRAP_GLIBC'])
 
 conf.Finish()
+
+# Keep Windows system libraries needed by static Cbang after Cbang itself.
+if env['PLATFORM'] == 'win32' or int(env.get('cross_mingw', 0)):
+    if 'iphlpapi' in env['LIBS']: env['LIBS'].remove('iphlpapi')
+    env.Append(LIBS = ['iphlpapi'])
 
 
 # Build in 'build'
@@ -276,7 +286,12 @@ if env['PLATFORM'] == 'posix':
 
 # Build other programs
 docs = ['README.md', 'LICENSE', 'COPYING', 'CHANGELOG.md']
-progs = 'gcodetool planner camsim'
+progs = '''
+  gcodetool planner camsim
+  camsim-dexel-state
+  camsim-path camsim-region-plan camsim-boundary-plan camsim-render-regions
+  camsim-stitch-stock camsim-reduce-export
+'''
 if env['with_tpl']: progs += ' tplang'
 
 for prog in progs.split():
@@ -317,9 +332,13 @@ for target in docs + ['examples']:
 env.Install(prefix + '/share/camotics/', 'machines')
 env.Install(prefix + '/share/camotics/', 'tpl_lib')
 env.Install(prefix + '/share/pixmaps', 'images/camotics.png')
-env.Install(prefix + '/share/applications', 'CAMotics.desktop')
+env.Install(prefix + '/share/applications',
+            'io.github.davronthemighty.CAMoticsFast.desktop')
 env.InstallAs(prefix + '/share/mime/packages/camotics.xml', 'mime.xml')
-env.Install(prefix + '/share/appdata/', 'CAMotics.appdata.xml')
+env.InstallAs(
+    prefix + '/share/metainfo/' +
+    'io.github.davronthemighty.CAMoticsFast.appdata.xml',
+    'io.github.davronthemighty.CAMoticsFast.metainfo.xml')
 env.Install(prefix + '/share/icons/hicolor/128x128/apps/', 'images/camotics.png')
 
 description = '''CAMotics is an Open-Source software which can simulate
@@ -417,7 +436,7 @@ if 'package' in COMMAND_LINE_TARGETS:
 
         documents = ['README.md', 'CHANGELOG.md'] + examples + machines,
         programs = list(map(lambda x: str(x[0]), execs)),
-        desktop_menu = ['CAMotics.desktop'],
+        desktop_menu = ['io.github.davronthemighty.CAMoticsFast.desktop'],
         changelog = 'CHANGELOG.md',
 
         nsi = 'camotics.nsi',

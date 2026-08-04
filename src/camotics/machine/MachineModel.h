@@ -33,6 +33,15 @@ namespace CAMotics {
     std::string name;
     cb::Vector3D tool;
     cb::Vector3D workpiece;
+    bool specsPresent = false;
+    cb::Vector3D workArea;
+    double gantryClearance = 0;
+    double maxTravelSpeed = 0;
+    double maxSpindleSpeed = 0;
+    double nominalResolution = 0;
+    double spindleRunout = 0;
+    std::string modelKind;
+    std::string specsSource;
 
     cb::Rectangle3D bounds;
 
@@ -44,6 +53,15 @@ namespace CAMotics {
     const cb::Rectangle3D &getBounds() const {return bounds;}
     const cb::Vector3D &getTool() const {return tool;}
     const cb::Vector3D &getWorkpiece() const {return workpiece;}
+    bool hasSpecs() const {return specsPresent;}
+    const cb::Vector3D &getWorkArea() const {return workArea;}
+    double getGantryClearance() const {return gantryClearance;}
+    double getMaxTravelSpeed() const {return maxTravelSpeed;}
+    double getMaxSpindleSpeed() const {return maxSpindleSpeed;}
+    double getNominalResolution() const {return nominalResolution;}
+    double getSpindleRunout() const {return spindleRunout;}
+    const std::string &getModelKind() const {return modelKind;}
+    const std::string &getSpecsSource() const {return specsSource;}
 
     typedef parts_t::const_iterator iterator;
     iterator begin() const {return parts.begin();}

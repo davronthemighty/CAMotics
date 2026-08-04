@@ -24,6 +24,7 @@
 #include <cbang/log/Logger.h>
 #include <cbang/Catch.h>
 
+#include <algorithm>
 #include <limits>
 
 using namespace std;
@@ -75,8 +76,19 @@ void ToolPathView::setPath(const SmartPointer<const GCode::ToolPath> &path) {
 
   move = GCode::Move();
   dirty = true;
+  pathBuffersLoaded = false;
+  prefixDistance.clear();
+  moveVertexOffsets.clear();
+  playbackFirstVertex = 0;
+  playbackNumVertices = 0;
+  playbackWindowLogged = false;
 
   if (path.isNull() || path->empty()) return;
+
+  prefixDistance.reserve(path->size() + 1);
+  prefixDistance.push_back(0);
+  for (const GCode::Move &item: *path)
+    prefixDistance.push_back(prefixDistance.back() + item.getDistance());
 
   // Output stats
   const Rectangle3D &bbox = getBounds();
@@ -141,6 +153,79 @@ void ToolPathView::setShowIntensity(bool show) {
 }
 
 
+void ToolPathView::setFastPlayback(bool fast) {
+  if (fastPlayback == fast) return;
+  fastPlayback = fast;
+  playbackWindowLogged = false;
+  if (!fastPlayback) {
+    playbackFirstVertex = 0;
+    playbackNumVertices = numVertices;
+    dirty = true;
+  }
+}
+
+
+void ToolPathView::setDisabledTools(const set<int> &tools) {
+  if (disabledTools == tools) return;
+  disabledTools = tools;
+  dirty = true;
+  pathBuffersLoaded = false;
+}
+
+
+void ToolPathView::updatePlaybackPosition() {
+  if (path.isNull() || path->empty()) return;
+
+  double targetTime = ratio * getTotalTime();
+  int index = path->find(targetTime);
+  if (index < 0) {
+    time = getTotalTime();
+    distance = getTotalDistance();
+    position = path->at(path->size() - 1).getEndPt();
+    move = GCode::Move();
+    index = path->size() - 1;
+  } else {
+    move = path->at(index);
+    double moveTime = move.getTime();
+    double fraction = moveTime ?
+      (targetTime - move.getStartTime()) / moveTime : 1;
+    fraction = max(0.0, min(1.0, fraction));
+    time = targetTime;
+    distance = prefixDistance[index] + move.getDistance() * fraction;
+    position = move.getPtAtTime(targetTime);
+    line = move.getLine();
+    filename = move.getFilename().isSet() ? *move.getFilename() : "";
+  }
+
+  // Keep the exact VBOs, but draw only a local trail and preview while Play
+  // is active.  Dense complete paths otherwise obscure the changing stock.
+  const unsigned trailMoves = 256;
+  const unsigned previewMoves = 64;
+  const unsigned currentMove = index;
+  const unsigned firstMove =
+    trailMoves < currentMove ? currentMove - trailMoves : 0;
+  const unsigned lastMove = min<unsigned>
+    (path->size(), currentMove + 1 + previewMoves);
+  if (moveVertexOffsets.size() == path->size() + 1) {
+    playbackFirstVertex = moveVertexOffsets[firstMove];
+    playbackNumVertices =
+      moveVertexOffsets[lastMove] - playbackFirstVertex;
+  } else {
+    playbackFirstVertex = 0;
+    playbackNumVertices = numVertices;
+  }
+  if (!playbackWindowLogged) {
+    playbackWindowLogged = true;
+    LOG_INFO(1, "Toolpath playback window: total_moves=" << path->size()
+             << " visible_moves=" << lastMove - firstMove
+             << " visible_vertices=" << playbackNumVertices);
+  }
+  moveIndex = -1;
+  values.updated();
+  dirty = false;
+}
+
+
 const char *ToolPathView::getDirection() const {
   if (!getMove().getSpeed()) return "Idle";
   return getMove().getSpeed() < 0 ? "Counterclockwise" : "Clockwise";
@@ -162,12 +247,16 @@ Color ToolPathView::getColor(GCode::MoveType type, double intensity) {
 void ToolPathView::update() {
   if (!dirty) return;
 
+  if (fastPlayback && !byLine && pathBuffersLoaded)
+    return updatePlaybackPosition();
+
   time = distance = 0;
   move = GCode::Move();
 
   vertices.clear();
   colors.clear();
   picking.clear();
+  moveVertexOffsets.clear();
 
   // Find maximum speed
   double maxSpeed = 0;
@@ -182,6 +271,7 @@ void ToolPathView::update() {
 
     for (unsigned i = 0; i < path->size(); i++) {
       const GCode::Move &move = path->at(i);
+      moveVertexOffsets.push_back(vertices.size() / 3);
 
       const Vector3D &start = move.getStartPt();
       Vector3D end          = move.getEndPt();
@@ -243,6 +333,8 @@ void ToolPathView::update() {
       double s =
         (showIntensity && maxSpeed) ? fabs(move.getSpeed()) / maxSpeed : 1;
       Color color = getColor(move.getType(), s);
+      if (disabledTools.count(move.getTool()))
+        color = Color(0.35, 0.35, 0.35);
 
       // Change color based on selection
       if (byLine && line == moveLine && fileMatch && moveMatch)
@@ -260,6 +352,7 @@ void ToolPathView::update() {
 
     if (!found && path->size())
         position = path->at(path->size() - 1).getEndPt();
+    moveVertexOffsets.push_back(vertices.size() / 3);
   }
 
   numVertices = vertices.size() / 3;
@@ -302,6 +395,7 @@ void ToolPathView::glDraw(GLContext &gl) {
     gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
     vertices.clear();
   }
+  pathBuffersLoaded = true;
 
   // Picking
   gl.glEnableVertexAttribArray(GL_ATTR_PICKING);
@@ -321,7 +415,11 @@ void ToolPathView::glDraw(GLContext &gl) {
   gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
 
   // Draw
-  gl.glDrawArrays(GL_LINES, 0, numVertices);
+  const unsigned firstVertex =
+    fastPlayback ? playbackFirstVertex : 0;
+  const unsigned drawVertices =
+    fastPlayback ? playbackNumVertices : numVertices;
+  if (drawVertices) gl.glDrawArrays(GL_LINES, firstVertex, drawVertices);
 
   // Clean up
   gl.glDisableVertexAttribArray(GL_ATTR_POSITION);

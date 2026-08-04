@@ -37,6 +37,7 @@ namespace CAMotics {
 
     void zoomIn();
     void zoomOut();
+    void zoomBy(double factor);
 
     void center();
 
@@ -48,6 +49,8 @@ namespace CAMotics {
 
     void startTranslation(int x, int y);
     void updateTranslation(int x, int y);
+    void panByPixels(double x, double y);
+    void orbitByPixels(double x, double y);
 
     void resetView(char c = 'p');
   };

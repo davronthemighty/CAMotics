@@ -38,6 +38,25 @@ using namespace cb;
 using namespace CAMotics;
 
 
+const char *CAMotics::simulationBackendPolicyName
+(SimulationBackendPolicy policy) {
+  switch (policy) {
+  case SimulationBackendPolicy::FULL_MC: return "full-mc";
+  case SimulationBackendPolicy::AUTO_DEXEL: return "auto-dexel";
+  }
+  return "full-mc";
+}
+
+
+const char *CAMotics::simulationBackendName(SimulationBackend backend) {
+  switch (backend) {
+  case SimulationBackend::FULL_MC: return "full-mc";
+  case SimulationBackend::DEXEL: return "dexel";
+  }
+  return "full-mc";
+}
+
+
 Simulation::~Simulation() {}
 
 
@@ -64,6 +83,21 @@ void Simulation::read(const JSON::Value &value) {
   resolution = value.getNumber("resolution", 0);
   time = value.getNumber("time", 0);
   mode = RenderMode::parse(value.getString("render-mode", mode.toString()));
+  toolSweepStockBounds =
+    value.getBoolean("toolsweep-stock-bounds", false);
+  adaptiveZRender = value.getBoolean("adaptive-z-render", false);
+  adaptiveZSlabHeight = value.getNumber("adaptive-z-slab-height", 0);
+  adaptiveZInitialDepth =
+    value.getNumber("adaptive-z-initial-depth", 0);
+  adaptiveZMargin = value.getNumber("adaptive-z-margin", 0);
+  adaptiveZRegionBins = value.getNumber("adaptive-z-region-bins", 0);
+  adaptiveZRegionRender =
+    value.getBoolean("adaptive-z-region-render", false);
+  string backend = value.getString("simulation-backend", "full-mc");
+  backendPolicy = backend == "auto-dexel" ?
+    SimulationBackendPolicy::AUTO_DEXEL : SimulationBackendPolicy::FULL_MC;
+  validateDexelTopology =
+    value.getBoolean("validate-dexel-topology", true);
 
   GCode::ToolTable tools;
   if (value.has("tools")) tools.read(*value.get("tools"));
@@ -95,6 +129,25 @@ void Simulation::write(JSON::Sink &sink) const {
   sink.insert("resolution", resolution);
   sink.insert("time", time);
   sink.insert("render-mode", mode.toString());
+  if (toolSweepStockBounds)
+    sink.insert("toolsweep-stock-bounds", toolSweepStockBounds);
+  if (adaptiveZRender) {
+    sink.insert("adaptive-z-render", adaptiveZRender);
+    sink.insert("adaptive-z-slab-height", adaptiveZSlabHeight);
+    sink.insert("adaptive-z-initial-depth", adaptiveZInitialDepth);
+    sink.insert("adaptive-z-margin", adaptiveZMargin);
+  }
+  if (adaptiveZRegionRender) {
+    sink.insert("adaptive-z-region-render", adaptiveZRegionRender);
+    sink.insert("adaptive-z-region-bins", adaptiveZRegionBins);
+    sink.insert("adaptive-z-slab-height", adaptiveZSlabHeight);
+    sink.insert("adaptive-z-initial-depth", adaptiveZInitialDepth);
+    sink.insert("adaptive-z-margin", adaptiveZMargin);
+  }
+  if (backendPolicy != SimulationBackendPolicy::FULL_MC)
+    sink.insert("simulation-backend", simulationBackendPolicyName(backendPolicy));
+  if (!validateDexelTopology)
+    sink.insert("validate-dexel-topology", validateDexelTopology);
 
   if (!path.isNull() && !path->getTools().empty()) {
     sink.beginInsert("tools");

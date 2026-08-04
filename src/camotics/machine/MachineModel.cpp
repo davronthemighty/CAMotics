@@ -35,9 +35,36 @@ void MachineModel::add(const cb::SmartPointer<MachinePart> &part) {
 
 
 void MachineModel::read(const JSON::Value &value) {
+  parts.clear();
+  bounds = Rectangle3D();
+  specsPresent = false;
+  workArea = Vector3D();
+  gantryClearance = maxTravelSpeed = maxSpindleSpeed = 0;
+  nominalResolution = spindleRunout = 0;
+  modelKind.clear();
+  specsSource.clear();
+
   name = value.getString("name");
   tool.read(value.getList("tool"));
   workpiece.read(value.getList("workpiece"));
+
+  if (value.hasDict("specs")) {
+    specsPresent = true;
+    auto &specs = value.getDict("specs");
+    if (specs.hasList("work-area"))
+      workArea.read(specs.getList("work-area"));
+    gantryClearance =
+      specs.getNumber("gantry-clearance", gantryClearance);
+    maxTravelSpeed =
+      specs.getNumber("max-travel-speed", maxTravelSpeed);
+    maxSpindleSpeed =
+      specs.getNumber("max-spindle-speed", maxSpindleSpeed);
+    nominalResolution =
+      specs.getNumber("nominal-resolution", nominalResolution);
+    spindleRunout = specs.getNumber("spindle-runout", spindleRunout);
+    modelKind = specs.getString("model-kind", "");
+    specsSource = specs.getString("source", "");
+  }
 
   auto &parts = value.getDict("parts");
   for (auto e: parts.entries())
@@ -55,6 +82,22 @@ void MachineModel::write(JSON::Sink &sink) const {
 
   sink.beginInsert("workpiece");
   workpiece.write(sink);
+
+  if (specsPresent) {
+    sink.insertDict("specs");
+
+    sink.beginInsert("work-area");
+    workArea.write(sink);
+
+    sink.insert("gantry-clearance", gantryClearance);
+    sink.insert("max-travel-speed", maxTravelSpeed);
+    sink.insert("max-spindle-speed", maxSpindleSpeed);
+    sink.insert("nominal-resolution", nominalResolution);
+    sink.insert("spindle-runout", spindleRunout);
+    if (!modelKind.empty()) sink.insert("model-kind", modelKind);
+    if (!specsSource.empty()) sink.insert("source", specsSource);
+    sink.endDict();
+  }
 
   sink.insertDict("parts");
   for (auto &it: parts) {

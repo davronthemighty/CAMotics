@@ -27,11 +27,24 @@
 
 #include <camotics/Task.h>
 
+#include <cstdint>
+
 
 namespace CAMotics {
   class ContourGenerator : public Task {
+  protected:
+    uint64_t cellsVisited = 0;
+    uint64_t cellsCulled = 0;
+    uint64_t cellsContoured = 0;
+    uint64_t triangles = 0;
+
   public:
     using Task::run;
     virtual void run(FieldFunction &func, GridTreeRef &tree) = 0;
+
+    uint64_t getCellsVisited() const {return cellsVisited;}
+    uint64_t getCellsCulled() const {return cellsCulled;}
+    uint64_t getCellsContoured() const {return cellsContoured;}
+    uint64_t getTriangles() const {return triangles;}
   };
 }

@@ -51,7 +51,6 @@ selection method.
 
 import os.path
 import re
-import six
 import subprocess
 
 import SCons.Action
@@ -60,6 +59,17 @@ import SCons.Defaults
 import SCons.Scanner
 import SCons.Tool
 import SCons.Util
+
+try:
+    import six
+except ImportError:
+    class _SixFallback:
+        try:
+            string_types = (basestring,)
+        except NameError:
+            string_types = (str,)
+
+    six = _SixFallback()
 
 
 try:
@@ -993,7 +1003,10 @@ def enable_modules(self, modules, debug = False, crosscompiling = False) :
             pcmodules.remove("Qt5Assistant")
             pcmodules.append("Qt5AssistantClient")
 
-        self.AppendUnique(RPATH = [os.path.join("$QT5DIR", "lib")])
+        qtLibDir = os.path.normpath(
+            os.path.join(self.subst("$QT5DIR"), "lib"))
+        if qtLibDir not in ("/usr/lib", "/usr/lib64"):
+            self.AppendUnique(RPATH = [qtLibDir])
         self.ParseConfig('pkg-config %s --libs --cflags' % ' '.join(pcmodules))
         self["QT5_MOCCPPPATH"] = self["CPPPATH"]
         return

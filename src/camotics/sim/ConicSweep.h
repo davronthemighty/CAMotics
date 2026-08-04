@@ -37,6 +37,11 @@ namespace CAMotics {
     void getBBoxes(const cb::Vector3D &start, const cb::Vector3D &end,
                    std::vector<cb::Rectangle3D> &bboxes,
                    double tolerance) const override;
+    void getBBoxesForQuery
+    (const cb::Vector3D &start, const cb::Vector3D &end,
+     const cb::Rectangle3D &queryBounds,
+     std::vector<cb::Rectangle3D> &bboxes,
+     double tolerance) const override;
     double depth(const cb::Vector3D &start, const cb::Vector3D &end,
                  const cb::Vector3D &p) const override;
   };

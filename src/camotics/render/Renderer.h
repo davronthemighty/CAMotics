@@ -21,6 +21,7 @@
 #pragma once
 
 #include "RenderMode.h"
+#include "RenderJob.h"
 
 #include <camotics/Task.h>
 
@@ -35,9 +36,12 @@ namespace CAMotics {
 
   class Renderer : cb::Condition {
     Task &task;
+    RenderStats stats;
 
   public:
     Renderer(Task &task) : task(task) {}
+
+    const RenderStats &getStats() const {return stats;}
 
     void render(CutWorkpiece &cutWorkpiece, GridTree &tree,
                 const cb::Rectangle3D &bbox, unsigned threads,

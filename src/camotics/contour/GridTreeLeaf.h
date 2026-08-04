@@ -21,6 +21,7 @@
 #pragma once
 
 
+#include "ContourProvenance.h"
 #include "GridTreeBase.h"
 #include "Triangle.h"
 
@@ -31,16 +32,20 @@
 namespace CAMotics {
   class GridTreeLeaf : public GridTreeBase {
     std::vector<Triangle> triangles;
+    std::vector<ContourTriangleProvenance> provenance;
 
   public:
     const std::vector<Triangle> &getTriangles() const {return triangles;}
 
     void add(const Triangle &t);
+    void add(const Triangle &t, const ContourTriangleProvenance &provenance);
+    void translateProvenance(const cb::Vector3U &offset);
 
     // From GridTreeBase
     bool isLeaf() const override {return true;}
     unsigned getCount() const override {return triangles.size();}
-    void gather(std::vector<float> &vertices,
-                std::vector<float> &normals) const override;
+    void gather(std::vector<float> &vertices, std::vector<float> &normals,
+                std::vector<ContourTriangleProvenance> *provenance = 0)
+      const override;
   };
 }

@@ -41,6 +41,19 @@ namespace cb {namespace JSON {class Sink;}}
 namespace CAMotics {
   class Workpiece;
 
+  enum class SimulationBackendPolicy {
+    FULL_MC,
+    AUTO_DEXEL,
+  };
+
+  enum class SimulationBackend {
+    FULL_MC,
+    DEXEL,
+  };
+
+  const char *simulationBackendPolicyName(SimulationBackendPolicy policy);
+  const char *simulationBackendName(SimulationBackend backend);
+
   class Simulation : public cb::JSON::Serializable {
   public:
     cb::SmartPointer<GCode::ToolPath> path;
@@ -51,14 +64,51 @@ namespace CAMotics {
     double time;
     RenderMode mode;
     unsigned threads;
+    unsigned toolSweepXYBins;
+    unsigned toolSweepXYZBins;
+    bool toolSweepStockBounds;
+    bool adaptiveZSlabMetrics;
+    bool adaptiveZRender;
+    double adaptiveZSlabHeight;
+    double adaptiveZInitialDepth;
+    double adaptiveZMargin;
+    unsigned adaptiveZRegionBins;
+    bool adaptiveZRegionRender;
+    SimulationBackendPolicy backendPolicy;
+    bool validateDexelTopology;
 
     Simulation(const cb::SmartPointer<GCode::ToolPath> &path,
                const cb::SmartPointer<GCode::PlannerConfig> &planConf,
                const cb::SmartPointer<Surface> &surface,
                const Workpiece &workpiece, double resolution, double time,
-               RenderMode mode, unsigned threads) :
+               RenderMode mode, unsigned threads,
+               unsigned toolSweepXYBins = 0,
+               unsigned toolSweepXYZBins = 0,
+               bool adaptiveZSlabMetrics = false,
+               bool adaptiveZRender = false,
+               double adaptiveZSlabHeight = 0,
+               double adaptiveZInitialDepth = 0,
+               double adaptiveZMargin = 0,
+               unsigned adaptiveZRegionBins = 0,
+               bool adaptiveZRegionRender = false,
+               bool toolSweepStockBounds = false,
+               SimulationBackendPolicy backendPolicy =
+                 SimulationBackendPolicy::FULL_MC,
+               bool validateDexelTopology = true) :
       path(path), planConf(planConf), surface(surface), workpiece(workpiece),
-      resolution(resolution), time(time), mode(mode), threads(threads) {}
+      resolution(resolution), time(time), mode(mode), threads(threads),
+      toolSweepXYBins(toolSweepXYBins),
+      toolSweepXYZBins(toolSweepXYZBins),
+      toolSweepStockBounds(toolSweepStockBounds),
+      adaptiveZSlabMetrics(adaptiveZSlabMetrics),
+      adaptiveZRender(adaptiveZRender),
+      adaptiveZSlabHeight(adaptiveZSlabHeight),
+      adaptiveZInitialDepth(adaptiveZInitialDepth),
+      adaptiveZMargin(adaptiveZMargin),
+      adaptiveZRegionBins(adaptiveZRegionBins),
+      adaptiveZRegionRender(adaptiveZRegionRender),
+      backendPolicy(backendPolicy),
+      validateDexelTopology(validateDexelTopology) {}
     ~Simulation();
 
     const GCode::ToolTable &getTools() const {return path->getTools();}

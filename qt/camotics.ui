@@ -457,6 +457,7 @@
     <addaction name="actionSlower"/>
     <addaction name="actionFaster"/>
     <addaction name="actionDirection"/>
+    <addaction name="actionSimulationEnd"/>
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
@@ -465,6 +466,7 @@
     <addaction name="actionConnect"/>
     <addaction name="actionExport"/>
     <addaction name="actionSnapshot"/>
+    <addaction name="actionDexelHeightMap"/>
     <addaction name="separator"/>
     <addaction name="actionExportToolTable"/>
     <addaction name="actionImportToolTable"/>
@@ -565,6 +567,9 @@
    <addaction name="actionSlower"/>
    <addaction name="actionFaster"/>
    <addaction name="actionDirection"/>
+   <addaction name="actionSimulationEnd"/>
+   <addaction name="separator"/>
+   <addaction name="actionDexelHeightMap"/>
   </widget>
   <widget class="QToolBar" name="perspectiveToolBar">
    <property name="windowTitle">
@@ -589,6 +594,25 @@
    <addaction name="actionRightView"/>
    <addaction name="actionTopView"/>
    <addaction name="actionBottomView"/>
+  </widget>
+  <widget class="QToolBar" name="referenceFrameToolBar">
+   <property name="windowTitle">
+    <string>Reference Frame Toolbar</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>22</width>
+     <height>22</height>
+    </size>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionStockFrame"/>
+   <addaction name="actionToolFrame"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="positionDockWidget">
@@ -2986,6 +3010,69 @@
    </property>
    <property name="toolTip">
     <string>Change tool path animation direction</string>
+   </property>
+  </action>
+  <action name="actionDexelHeightMap">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="camotics.qrc">
+     <normaloff>:/icons/surface.png</normaloff>:/icons/surface.png</iconset>
+   </property>
+   <property name="text">
+    <string>Dexel &amp;Height Map</string>
+   </property>
+   <property name="iconText">
+    <string>Height Map</string>
+   </property>
+   <property name="toolTip">
+    <string>Show the current Dexel grid as an 8-bit grayscale height map</string>
+   </property>
+  </action>
+  <action name="actionSimulationEnd">
+   <property name="icon">
+    <iconset resource="camotics.qrc">
+     <normaloff>:/icons/end.png</normaloff>:/icons/end.png</iconset>
+   </property>
+   <property name="text">
+    <string>Simulation &amp;End</string>
+   </property>
+   <property name="toolTip">
+    <string>Pause playback and show the exact final simulation result</string>
+   </property>
+  </action>
+  <action name="actionStockFrame">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="camotics.qrc">
+     <normaloff>:/icons/bbox.png</normaloff>:/icons/bbox.png</iconset>
+   </property>
+   <property name="text">
+    <string>Stock Frame</string>
+   </property>
+   <property name="toolTip">
+    <string>Keep the stock fixed in the view</string>
+   </property>
+  </action>
+  <action name="actionToolFrame">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="camotics.qrc">
+     <normaloff>:/icons/tool.png</normaloff>:/icons/tool.png</iconset>
+   </property>
+   <property name="text">
+    <string>Tool Frame</string>
+   </property>
+   <property name="toolTip">
+    <string>Keep the active tool centered while the stock moves through the view</string>
    </property>
   </action>
   <action name="actionAddTool">

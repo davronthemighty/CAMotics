@@ -42,6 +42,8 @@ namespace CAMotics {
 
     std::vector<float> lines;
 
+    void addBox(const cb::Vector3D &min, const cb::Vector3D &max);
+
   public:
     MachinePart(const std::string &name, const cb::JSON::ValuePtr &config);
 

@@ -20,8 +20,11 @@
 
 #include "MarchingCubes.h"
 
+#include "ContourProvenance.h"
 #include "CubeSlice.h"
 #include "GridTreeLeaf.h"
+
+#include <camotics/Profile.h>
 
 using namespace cb;
 using namespace CAMotics;
@@ -44,12 +47,21 @@ void MarchingCubes::doCell(GridTreeRef &tree, const CubeSlice &slice,
   for (int j = 0; j < 5; j++) {
     if (triangleConnectionTable[index][3 * j] < 0) break;
 
-    for (int i = 0; i < 3; i++)
-      t[i] = edges[triangleConnectionTable[index][3 * j + i]].vertex;
+    ContourTriangleProvenance provenance;
+    provenance.algorithm = ContourTriangleProvenance::MARCHING_CUBES;
+    provenance.cell = offset;
+
+    for (int i = 0; i < 3; i++) {
+      uint8_t edge = triangleConnectionTable[index][3 * j + i];
+      t[i] = edges[edge].vertex;
+      provenance.vertices[i] = ContourVertexProvenance::gridEdge(edge);
+    }
 
     t.updateNormal();
 
-    leaf->add(t);
+    leaf->add(t, provenance);
+    triangles++;
+    Profile::count(ProfileCounter::CONTOUR_GRID_EDGE_TRIANGLES);
   }
 
   tree.insertLeaf(leaf.adopt(), offset);

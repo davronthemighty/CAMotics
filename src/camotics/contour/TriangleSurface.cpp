@@ -20,20 +20,43 @@
 
 #include "TriangleSurface.h"
 
+#include "ContourProvenance.h"
 #include "TriangleMesh.h"
 #include "GridTree.h"
 
 #include <cbang/Exception.h>
 #include <cbang/log/Logger.h>
 
+#include <camotics/Profile.h>
 #include <camotics/Task.h>
 
 #include <stl/Source.h>
 #include <stl/Sink.h>
 
+#include <limits>
+#include <utility>
+
 using namespace std;
 using namespace cb;
 using namespace CAMotics;
+
+
+namespace {
+  ContourProvenanceReport getLightweightProvenanceReport
+    (const vector<ContourTriangleProvenance> &provenance,
+     uint64_t expectedTriangles) {
+    ContourProvenanceReport report;
+    report.expectedTriangles = expectedTriangles;
+    report.triangles = provenance.size();
+
+    for (const auto &triangle: provenance)
+      if (triangle.algorithm == ContourTriangleProvenance::UNKNOWN_ALGORITHM)
+        report.unknownTriangles++;
+      else report.completeTriangles++;
+
+    return report;
+  }
+}
 
 
 TriangleSurface::TriangleSurface(const GridTree &tree) {add(tree);}
@@ -45,6 +68,30 @@ TriangleSurface::TriangleSurface(STL::Source &source, Task *task) {
 
 
 TriangleSurface::TriangleSurface(vector<SmartPointer<Surface> > &surfaces) {
+  bool preserveProvenance =
+    Profile::isEnabled() || shouldCaptureContourProvenance();
+  if (preserveProvenance) {
+    uint64_t provenanceTriangles = 0;
+    for (unsigned i = 0; i < surfaces.size(); i++) {
+      TriangleSurface *s = dynamic_cast<TriangleSurface *>(surfaces[i].get());
+      if (!s || !s->hasContourProvenance()) {
+        preserveProvenance = false;
+        break;
+      }
+      uint64_t triangles = s->getTriangleCount();
+      if (numeric_limits<uint64_t>::max() - provenanceTriangles <
+          triangles) {
+        preserveProvenance = false;
+        break;
+      }
+      provenanceTriangles += triangles;
+    }
+
+    if (preserveProvenance &&
+        provenanceTriangles <= contourProvenance.max_size())
+      contourProvenance.reserve((size_t)provenanceTriangles);
+    else preserveProvenance = false;
+  }
 
   for (unsigned i = 0; i < surfaces.size(); i++) {
     TriangleSurface *s = dynamic_cast<TriangleSurface *>(surfaces[i].get());
@@ -54,14 +101,57 @@ TriangleSurface::TriangleSurface(vector<SmartPointer<Surface> > &surfaces) {
     vertices.insert(vertices.end(), s->vertices.begin(), s->vertices.end());
     normals.insert(normals.end(), s->normals.begin(), s->normals.end());
     bounds.add(s->bounds);
+    if (preserveProvenance)
+      contourProvenance.insert
+        (contourProvenance.end(), s->contourProvenance.begin(),
+         s->contourProvenance.end());
 
     surfaces[i] = 0; // Free memory as we go
+  }
+
+  if (preserveProvenance) {
+    const uint64_t triangleCount = vertices.size() / 9;
+    ContourProvenanceReport report;
+    if (Profile::isEnabled()) {
+      Profile::Scope scope("surface_merge_analyze_contour_provenance");
+      report = analyzeContourProvenance
+        (contourProvenance, vertices, 0, triangleCount);
+    } else
+      report = getLightweightProvenanceReport
+        (contourProvenance, triangleCount);
+    if (Profile::isEnabled()) emitContourProvenanceMetrics(report);
+
+    if (report.triangles == report.expectedTriangles) {
+      contourProvenanceReport = report;
+      contourProvenanceValid = true;
+      if (shouldCaptureContourProvenance()) {
+        Profile::Scope scope("surface_merge_build_contour_provenance_neighbors");
+        contourProvenanceNeighborsValid = buildContourProvenanceNeighbors
+          (contourProvenance, vertices, 0, report.expectedTriangles,
+           contourProvenanceNeighbors, 1e-4, &contourProvenanceNeighborsRaw);
+        if (!Profile::isEnabled())
+          contourProvenanceReport.watertight =
+            contourProvenanceNeighborsValid;
+        if (!Profile::isEnabled() && contourProvenanceNeighborsValid)
+          releaseContourProvenanceRecords();
+      }
+
+    } else clearContourProvenance();
   }
 }
 
 
 TriangleSurface::TriangleSurface(const TriangleSurface &o) :
-  TriangleMesh(o), bounds(o.bounds) {}
+  TriangleMesh(o), bounds(o.bounds),
+  contourProvenance(o.contourProvenance),
+  contourProvenanceNeighbors(o.contourProvenanceNeighbors),
+  contourProvenanceReport(o.contourProvenanceReport),
+  contourProvenanceValid(o.contourProvenanceValid),
+  contourProvenanceNeighborsValid(o.contourProvenanceNeighborsValid),
+  contourProvenanceNeighborsRaw(o.contourProvenanceNeighborsRaw),
+  reductionEligibility(o.reductionEligibility),
+  reductionEligibilityPresent(o.reductionEligibilityPresent),
+  sparseAcceptedSurface(o.sparseAcceptedSurface) {}
 
 
 void TriangleSurface::add(const Vector3F vertices[3]) {
@@ -80,6 +170,9 @@ void TriangleSurface::add(const Vector3F vertices[3]) {
 
 
 void TriangleSurface::add(const Vector3F vertices[3], const Vector3F &normal) {
+  clearContourProvenance();
+  clearReductionEligibility();
+
   for (unsigned i = 0; i < 3; i++) {
     bounds.add(vertices[i]);
 
@@ -92,11 +185,50 @@ void TriangleSurface::add(const Vector3F vertices[3], const Vector3F &normal) {
 
 
 void TriangleSurface::add(const GridTree &tree) {
-  unsigned start = getTriangleCount();
+  uint64_t startTriangles = vertices.size() / 9;
+  uint64_t start = vertices.size();
+  clearContourProvenance();
+  clearReductionEligibility();
 
-  tree.gather(vertices, normals);
+  if (Profile::isEnabled() || shouldCaptureContourProvenance()) {
+    vector<ContourTriangleProvenance> provenance;
+    if (tree.getCount() <= provenance.max_size())
+      provenance.reserve((size_t)tree.getCount());
+    {
+      Profile::Scope scope("surface_gather_contour_provenance");
+      tree.gather(vertices, normals, &provenance);
+    }
+    const uint64_t addedTriangles = vertices.size() / 9 - startTriangles;
+    ContourProvenanceReport report;
+    if (Profile::isEnabled()) {
+      Profile::Scope scope("surface_analyze_contour_provenance");
+      report = analyzeContourProvenance
+        (provenance, vertices, start, addedTriangles);
+    } else
+      report = getLightweightProvenanceReport
+        (provenance, addedTriangles);
+    if (Profile::isEnabled()) emitContourProvenanceMetrics(report);
 
-  for (unsigned i = start; i < vertices.size(); i += 3)
+    if (!startTriangles && report.triangles == report.expectedTriangles) {
+      contourProvenance = std::move(provenance);
+      contourProvenanceReport = report;
+      contourProvenanceValid = true;
+      if (shouldCaptureContourProvenance()) {
+        Profile::Scope scope("surface_build_contour_provenance_neighbors");
+        contourProvenanceNeighborsValid = buildContourProvenanceNeighbors
+          (contourProvenance, vertices, start, report.expectedTriangles,
+           contourProvenanceNeighbors, 1e-4, &contourProvenanceNeighborsRaw);
+        if (!Profile::isEnabled())
+          contourProvenanceReport.watertight =
+            contourProvenanceNeighborsValid;
+        if (!Profile::isEnabled() && contourProvenanceNeighborsValid)
+          releaseContourProvenanceRecords();
+      }
+    }
+
+  } else tree.gather(vertices, normals);
+
+  for (size_t i = start; i < vertices.size(); i += 3)
     bounds.add(Vector3F(vertices[i], vertices[i + 1], vertices[i + 2]));
 }
 
@@ -104,8 +236,84 @@ void TriangleSurface::add(const GridTree &tree) {
 void TriangleSurface::clear() {
   vertices.clear();
   normals.clear();
+  clearContourProvenance();
+  clearReductionEligibility();
 
   bounds = Rectangle3D();
+}
+
+
+void TriangleSurface::releaseContourProvenanceRecords() {
+  vector<ContourTriangleProvenance>().swap(contourProvenance);
+}
+
+
+void TriangleSurface::clearContourProvenance() {
+  contourProvenance.clear();
+  contourProvenanceNeighbors.clear();
+  contourProvenanceReport = ContourProvenanceReport();
+  contourProvenanceValid = false;
+  contourProvenanceNeighborsValid = false;
+  contourProvenanceNeighborsRaw = false;
+}
+
+
+void TriangleSurface::clearReductionEligibility() {
+  reductionEligibility = ReductionEligibility();
+  reductionEligibilityPresent = false;
+}
+
+
+void TriangleSurface::setReductionEligibility
+(const ReductionEligibility &eligibility) {
+  reductionEligibility = eligibility;
+  reductionEligibilityPresent = eligibility.validFor(vertices);
+}
+
+
+void TriangleSurface::replace(const vector<float> &vertices,
+                              const vector<float> &normals) {
+  this->vertices = vertices;
+  this->normals = normals;
+  clearContourProvenance();
+  clearReductionEligibility();
+  bounds = Rectangle3D();
+
+  for (size_t i = 0; i + 2 < this->vertices.size(); i += 3)
+    bounds.add(Vector3F(this->vertices[i], this->vertices[i + 1],
+                        this->vertices[i + 2]));
+}
+
+
+void TriangleSurface::replace(vector<float> &&vertices,
+                              vector<float> &&normals) {
+  this->vertices = std::move(vertices);
+  this->normals = std::move(normals);
+  clearContourProvenance();
+  clearReductionEligibility();
+  bounds = Rectangle3D();
+
+  for (size_t i = 0; i + 2 < this->vertices.size(); i += 3)
+    bounds.add(Vector3F(this->vertices[i], this->vertices[i + 1],
+                        this->vertices[i + 2]));
+}
+
+
+void TriangleSurface::swap(TriangleSurface &surface) {
+  this->vertices.swap(surface.vertices);
+  this->normals.swap(surface.normals);
+  std::swap(bounds, surface.bounds);
+  contourProvenance.swap(surface.contourProvenance);
+  contourProvenanceNeighbors.swap(surface.contourProvenanceNeighbors);
+  std::swap(contourProvenanceReport, surface.contourProvenanceReport);
+  std::swap(contourProvenanceValid, surface.contourProvenanceValid);
+  std::swap(contourProvenanceNeighborsValid,
+            surface.contourProvenanceNeighborsValid);
+  std::swap(contourProvenanceNeighborsRaw,
+             surface.contourProvenanceNeighborsRaw);
+  std::swap(reductionEligibility, surface.reductionEligibility);
+  std::swap(reductionEligibilityPresent, surface.reductionEligibilityPresent);
+  std::swap(sparseAcceptedSurface, surface.sparseAcceptedSurface);
 }
 
 

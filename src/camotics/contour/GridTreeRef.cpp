@@ -19,6 +19,7 @@
 \******************************************************************************/
 
 #include "GridTreeRef.h"
+#include "GridTreeLeaf.h"
 
 #include <cbang/Exception.h>
 
@@ -28,7 +29,9 @@ using namespace CAMotics;
 
 
 GridTreeRef::GridTreeRef(GridTree *ref, const Vector3U &offset,
-                         const Vector3U &steps) : ref(ref), offset(offset) {
+                         const Vector3U &steps,
+                         const Vector3U &provenanceOffset) :
+  ref(ref), offset(offset), provenanceOffset(provenanceOffset) {
 
   setResolution(ref->getResolution());
   setOffset(ref->getOffset() + (Vector3D)offset * ref->getResolution());
@@ -42,11 +45,14 @@ unsigned GridTreeRef::getCount() const {
 
 
 void GridTreeRef::insertLeaf(GridTreeLeaf *leaf, const Vector3U &offset) {
+  // Translate a job-local owned cell offset into the shared tree.  Boundary
+  // samples used to contour that cell are intentionally not ownership.
+  leaf->translateProvenance(provenanceOffset);
   ref->insertLeaf(leaf, this->offset + offset);
 }
 
 
-void GridTreeRef::gather(vector<float> &vertices,
-                         vector<float> &normals) const {
+void GridTreeRef::gather(vector<float> &vertices, vector<float> &normals,
+                         vector<ContourTriangleProvenance> *provenance) const {
   THROW("Cannot call " << __func__ << " on GridTreeRef");
 }

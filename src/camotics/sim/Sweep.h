@@ -35,11 +35,17 @@ namespace CAMotics {
     void getBBoxes(const cb::Vector3D &start, const cb::Vector3D &end,
                    std::vector<cb::Rectangle3D> &bboxes, double radius,
                    double length, double zOffset,
-                   double tolerance = 0.01) const;
+                   double tolerance = 0.01,
+                   double splitRadius = -1) const;
 
     virtual void getBBoxes(const cb::Vector3D &start, const cb::Vector3D &end,
                            std::vector<cb::Rectangle3D> &bboxes,
                            double tolerance = 0.01) const = 0;
+    virtual void getBBoxesForQuery
+    (const cb::Vector3D &start, const cb::Vector3D &end,
+     const cb::Rectangle3D &queryBounds,
+     std::vector<cb::Rectangle3D> &bboxes,
+     double tolerance = 0.01) const;
     virtual bool intersects(const GCode::Move &move,
                             const cb::Rectangle3D &box) const {return false;}
     virtual double depth(const cb::Vector3D &start, const cb::Vector3D &end,

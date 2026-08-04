@@ -62,6 +62,16 @@ void SettingsDialog::setPlannerEnabled(bool enabled) {
 }
 
 
+SimulationBackendPolicy SettingsDialog::getSimulationBackendPolicy() const {
+  // Auto is safe for normal GUI use: it selects Dexel only after the
+  // established eligibility checks pass and otherwise falls back to the
+  // full marching-cubes reference.  An explicitly saved Full MC selection
+  // remains authoritative.
+  return settings.get("Settings/SimulationBackend", 1).toInt() == 1 ?
+    SimulationBackendPolicy::AUTO_DEXEL : SimulationBackendPolicy::FULL_MC;
+}
+
+
 void SettingsDialog::loadPlanVec(const string &widget, const string &var,
                                  GCode::Axes &axes, double scale) {
   auto v = settings.getVector3D("Settings/" + var, axes.getXYZ() / scale);
@@ -138,6 +148,10 @@ void SettingsDialog::load(Project::Project &project, View &view) {
   ui.renderModeComboBox->
     setCurrentIndex(settings.get("Settings/RenderMode", 0).toInt());
 
+  ui.simulationBackendComboBox->setCurrentIndex
+    (getSimulationBackendPolicy() == SimulationBackendPolicy::AUTO_DEXEL ?
+     1 : 0);
+
   ui.aabbCheckBox->setChecked(view.isFlagSet(View::SHOW_BBTREE_FLAG));
   ui.aabbLeavesCheckBox->setChecked(view.isFlagSet(View::BBTREE_LEAVES_FLAG));
 
@@ -161,6 +175,8 @@ void SettingsDialog::save(Project::Project &project, View &view) {
   settings.set("Settings/Units", ui.defaultUnitsComboBox->currentIndex());
 
   settings.set("Settings/RenderMode", ui.renderModeComboBox->currentIndex());
+  settings.set("Settings/SimulationBackend",
+               ui.simulationBackendComboBox->currentIndex());
 
   view.setFlag(View::SHOW_BBTREE_FLAG, ui.aabbCheckBox->isChecked());
   view.setFlag(View::BBTREE_LEAVES_FLAG, ui.aabbLeavesCheckBox->isChecked());

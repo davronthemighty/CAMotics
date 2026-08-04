@@ -43,8 +43,9 @@ namespace CAMotics {
     unsigned getCount() const override {return count;}
     void insertLeaf(GridTreeLeaf *leaf, const cb::Vector3U &steps,
                     const cb::Vector3U &offset) override;
-    void gather(std::vector<float> &vertices,
-                std::vector<float> &normals) const override;
+    void gather(std::vector<float> &vertices, std::vector<float> &normals,
+                std::vector<ContourTriangleProvenance> *provenance = 0)
+      const override;
   };
 }
 

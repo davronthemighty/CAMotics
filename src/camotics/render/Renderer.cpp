@@ -23,6 +23,7 @@
 #include "RenderJob.h"
 
 #include <camotics/Grid.h>
+#include <camotics/Profile.h>
 #include <camotics/sim/CutWorkpiece.h>
 
 #include <cbang/String.h>
@@ -33,6 +34,7 @@
 #include <cbang/Catch.h>
 
 #include <cmath>
+#include <cstdint>
 #include <list>
 
 using namespace std;
@@ -43,6 +45,7 @@ using namespace CAMotics;
 void Renderer::render(CutWorkpiece &cutWorkpiece, GridTree &tree,
                       const Rectangle3D &bbox, unsigned threads,
                       RenderMode mode) {
+  stats = RenderStats();
   // Check for empty workpiece
   auto bounds = tree.getBounds();
   if (!bounds.isValid()) {
@@ -61,8 +64,42 @@ void Renderer::render(CutWorkpiece &cutWorkpiece, GridTree &tree,
     unsigned targetJobCount = pow(2, ceil(log(threads) / log(2)) + 2);
 
     task.begin("Partitioning 3D space");
-    tree.partition(jobGrids, bbox, targetJobCount);
+    {
+      Profile::Scope scope("partitioning");
+      tree.partition(jobGrids, bbox, targetJobCount);
+    }
     unsigned totalJobCount = jobGrids.size();
+
+    uint64_t treeCells = tree.getTotalCells();
+    uint64_t partitionCells = 0;
+    uint64_t minJobCells =
+      jobGrids.empty() ? 0 : jobGrids.front().getTotalCells();
+    uint64_t maxJobCells = 0;
+    for (const auto &jobGrid: jobGrids) {
+      uint64_t cells = jobGrid.getTotalCells();
+      partitionCells += cells;
+      if (cells < minJobCells) minJobCells = cells;
+      if (maxJobCells < cells) maxJobCells = cells;
+    }
+
+    Profile::setMetric("render_target_jobs", targetJobCount);
+    Profile::setMetric("render_actual_jobs", totalJobCount);
+    Profile::setMetric("render_tree_cells", treeCells);
+    Profile::setMetric("render_partition_cells", partitionCells);
+    uint64_t extraCells =
+      treeCells < partitionCells ? partitionCells - treeCells : 0;
+    uint64_t missingCells =
+      partitionCells < treeCells ? treeCells - partitionCells : 0;
+    bool fullTreeCoverage = bbox.contains(bounds);
+
+    Profile::setMetric("render_partition_extra_cells", extraCells);
+    Profile::setMetric("render_partition_missing_cells", missingCells);
+    Profile::setMetric("render_partition_clipped_cells",
+                       fullTreeCoverage ? 0 : missingCells);
+    Profile::setMetric("render_partition_full_tree_coverage",
+                       fullTreeCoverage ? 1 : 0);
+    Profile::setMetric("render_job_cells_min", minJobCells);
+    Profile::setMetric("render_job_cells_max", maxJobCells);
 
     LOG_DEBUG(1, "Partitioned in to " << totalJobCount << " jobs");
     LOG_INFO(1, "Computing surface bounded by " << bounds << " at "
@@ -71,6 +108,7 @@ void Renderer::render(CutWorkpiece &cutWorkpiece, GridTree &tree,
     // Run jobs
     double lastUpdate = 0;
     task.begin("Computing cut surface");
+    Profile::Scope renderScope("render");
     while (!task.shouldQuit() && !(jobGrids.empty() && jobs.empty())) {
       // Start new jobs
       while (!jobGrids.empty() && jobs.size() < threads) {
@@ -86,6 +124,7 @@ void Renderer::render(CutWorkpiece &cutWorkpiece, GridTree &tree,
       for (it = jobs.begin(); it != jobs.end() && !task.shouldQuit();)
         if ((*it)->getState() == Thread::THREAD_DONE) {
           (*it)->join();
+          stats.add((*it)->getStats());
           it = jobs.erase(it);
         } else it++;
 
@@ -118,6 +157,8 @@ void Renderer::render(CutWorkpiece &cutWorkpiece, GridTree &tree,
   } CATCH_ERROR;
 
   // Clean up remaining jobs in case of an early exit
-  for (jobs_t::iterator it = jobs.begin(); it != jobs.end(); it++)
+  for (jobs_t::iterator it = jobs.begin(); it != jobs.end(); it++) {
     (*it)->join();
+    stats.add((*it)->getStats());
+  }
 }

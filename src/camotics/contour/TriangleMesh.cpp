@@ -368,7 +368,7 @@ void TriangleMesh::reduce(Task &task) {
 bool TriangleMesh::moreThan2InCommon(VertexSet &vs1, VertexSet &vs2) {
   unsigned count = 0;
   VertexSet::iterator it1 = vs1.begin();
-  VertexSet::iterator it2 = vs2.end();
+  VertexSet::iterator it2 = vs2.begin();
 
   while (it1 != vs1.end() && it2 != vs2.end()) {
     if (**it1 == **it2) {

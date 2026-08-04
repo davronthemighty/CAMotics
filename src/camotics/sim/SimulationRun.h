@@ -25,6 +25,8 @@
 
 #include <cbang/SmartPointer.h>
 
+#include <memory>
+
 
 namespace CAMotics {
   class ToolSweep;
@@ -32,12 +34,14 @@ namespace CAMotics {
   class Surface;
   class MoveLookup;
   class Task;
+  namespace Dexel {class State;}
 
 
   class SimulationRun {
     Simulation sim;
     cb::SmartPointer<ToolSweep> sweep;
     cb::SmartPointer<GridTree> tree;
+    std::shared_ptr<Dexel::State> dexelState;
 
     double lastTime = 0;
 
@@ -48,6 +52,12 @@ namespace CAMotics {
     Simulation &getSimulation() {return sim;}
 
     cb::SmartPointer<MoveLookup> getMoveLookup() const;
+    bool isInitialized() const {return !sweep.isNull();}
+    bool hasDexelState() const {return (bool)dexelState;}
+    const std::shared_ptr<Dexel::State> &getDexelState() const
+    {return dexelState;}
+    void setDexelState(const std::shared_ptr<Dexel::State> &state)
+    {dexelState = state;}
 
     void setEndTime(double endTime);
 

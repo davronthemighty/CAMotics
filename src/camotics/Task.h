@@ -22,12 +22,13 @@
 
 #include <cbang/thread/Condition.h>
 
+#include <atomic>
 #include <string>
 
 
 namespace CAMotics {
   class Task : public cb::Condition {
-    bool interrupted = false;
+    std::atomic<bool> interrupted{false};
 
     double startTime = 0;
     double endTime = 0;
@@ -39,8 +40,10 @@ namespace CAMotics {
     Task() {}
     virtual ~Task() {}
 
-    virtual void interrupt() {interrupted = true;}
-    virtual bool shouldQuit() const {return interrupted;}
+    virtual void interrupt() {interrupted.store(true, std::memory_order_release);}
+    virtual bool shouldQuit() const {
+      return interrupted.load(std::memory_order_acquire);
+    }
     virtual std::string getStatus() const;
     virtual double getProgress() const;
     virtual double getETA() const;

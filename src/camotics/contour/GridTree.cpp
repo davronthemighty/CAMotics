@@ -38,7 +38,8 @@ GridTree::~GridTree() {}
 
 
 void GridTree::partition(vector<GridTreeRef> &grids,
-                         const Rectangle3D &bbox, unsigned count) {
+                         const Rectangle3D &bbox, unsigned count,
+                         const Vector3U &provenanceBase) {
   Rectangle3D bounds = getBounds();
   if (isEmpty() || !bbox.intersects(bounds)) return;
 
@@ -46,6 +47,9 @@ void GridTree::partition(vector<GridTreeRef> &grids,
     Vector3U offset;
     Vector3U steps(getSteps());
 
+    // offset/steps describe this job's owned cell range.  Contouring may
+    // sample boundary vertices around those cells, but geometry insertion must
+    // remain limited to this owned range.
     Rectangle3D intersection = bbox.intersection(bounds);
     if (intersection != bounds) {
       intersection = (intersection - getOffset()) / getResolution();
@@ -61,17 +65,24 @@ void GridTree::partition(vector<GridTreeRef> &grids,
         else steps[i] = dims[i];
     }
 
-    grids.push_back(GridTreeRef(this, offset, steps));
+    grids.push_back(GridTreeRef(this, offset, steps,
+                                provenanceBase + offset));
     return;
   }
 
-  pair<Grid, Grid> parts = Grid::split(largestDim());
+  unsigned splitAxis = largestDim();
+  pair<Grid, Grid> parts = Grid::split(splitAxis);
 
   if (!left) left = new GridTree(parts.first);
   if (!right) right = new GridTree(parts.second);
 
-  dynamic_cast<GridTree *>(left)->partition(grids, bbox, count / 2);
-  dynamic_cast<GridTree *>(right)->partition(grids, bbox, count - count / 2);
+  Vector3U rightProvenanceBase(provenanceBase);
+  rightProvenanceBase[splitAxis] += parts.first.getSteps()[splitAxis];
+
+  dynamic_cast<GridTree *>(left)->partition
+    (grids, bbox, count / 2, provenanceBase);
+  dynamic_cast<GridTree *>(right)->partition
+    (grids, bbox, count - count / 2, rightProvenanceBase);
 }
 
 

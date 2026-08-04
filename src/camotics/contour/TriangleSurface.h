@@ -21,8 +21,12 @@
 #pragma once
 
 
+#include "ContourProvenance.h"
+#include "ReductionEligibility.h"
 #include "Surface.h"
 #include "TriangleMesh.h"
+
+#include <cstdint>
 
 
 #include <cbang/SmartPointer.h>
@@ -37,6 +41,17 @@ namespace CAMotics {
 
   class TriangleSurface : public Surface, public TriangleMesh {
     cb::Rectangle3D bounds;
+    std::vector<ContourTriangleProvenance> contourProvenance;
+    std::vector<int32_t> contourProvenanceNeighbors;
+    ContourProvenanceReport contourProvenanceReport;
+    bool contourProvenanceValid = false;
+    bool contourProvenanceNeighborsValid = false;
+    bool contourProvenanceNeighborsRaw = false;
+    ReductionEligibility reductionEligibility;
+    bool reductionEligibilityPresent = false;
+    bool sparseAcceptedSurface = false;
+
+    void releaseContourProvenanceRecords();
 
   public:
     TriangleSurface() {}
@@ -50,10 +65,34 @@ namespace CAMotics {
     void add(const GridTree &tree);
 
     void clear();
+    void replace(const std::vector<float> &vertices,
+                 const std::vector<float> &normals);
+    void replace(std::vector<float> &&vertices, std::vector<float> &&normals);
+    void swap(TriangleSurface &surface);
     void read(STL::Source &source, Task *task = 0);
 
     const std::vector<float> &getVertices() const {return vertices;}
     const std::vector<float> &getNormals()  const {return normals;}
+    bool hasContourProvenance() const {return contourProvenanceValid;}
+    const std::vector<ContourTriangleProvenance> &getContourProvenance() const
+      {return contourProvenance;}
+    const ContourProvenanceReport &getContourProvenanceReport() const
+      {return contourProvenanceReport;}
+    bool hasContourProvenanceNeighbors() const
+      {return contourProvenanceNeighborsValid;}
+    bool hasRawContourProvenanceNeighbors() const
+      {return contourProvenanceNeighborsValid && contourProvenanceNeighborsRaw;}
+    const std::vector<int32_t> &getContourProvenanceNeighbors() const
+      {return contourProvenanceNeighbors;}
+    void clearContourProvenance();
+    bool hasReductionEligibility() const {return reductionEligibilityPresent;}
+    const ReductionEligibility &getReductionEligibility() const
+      {return reductionEligibility;}
+    void setReductionEligibility(const ReductionEligibility &eligibility);
+    void clearReductionEligibility();
+    bool isSparseAcceptedSurface() const {return sparseAcceptedSurface;}
+    void markSparseAcceptedSurface(bool value = true)
+      {sparseAcceptedSurface = value;}
 
     // From Surface
     cb::SmartPointer<Surface> copy() const override;

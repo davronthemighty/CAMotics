@@ -37,5 +37,8 @@ namespace CAMotics {
 
     virtual void read(const cb::InputSource &source)
       {CBANG_THROW("read() not implemented");}
+
+  protected:
+    int versionAction() override;
   };
 }

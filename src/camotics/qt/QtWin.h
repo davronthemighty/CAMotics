@@ -51,6 +51,9 @@
 #include <QApplication>
 #include <QTranslator>
 
+#include <cstdint>
+#include <set>
+
 namespace cb {class Application;}
 namespace Ui {class CAMoticsWindow;}
 namespace GCode {class ToolPath;}
@@ -99,6 +102,8 @@ namespace CAMotics {
     QIcon backwardIcon;
 
     QLabel *statusLabel;
+    QStandardItemModel *toolTableModel = 0;
+    QShortcut *playPauseShortcut = 0;
     QString currentLang;
 
     cb::Application &app;
@@ -128,9 +133,31 @@ namespace CAMotics {
     bool lastStatusActive   = false;
     bool autoPlay           = false;
     bool autoClose          = false;
+    bool autoCloseAfterSimulation = false;
+    unsigned autoSeekIndex = 0;
+    bool simulationSeekBurstInjected = false;
+    bool simulationEndInjected = false;
+    bool viewControlsTested = false;
+    bool dexelGridWindowTested = false;
+    unsigned dexelGridWindowTestStage = 0;
     std::string defaultExample;
     bool sliderMoving       = false;
     bool positionChanged    = false;
+    double pendingSimulationTime = 0;
+    double lastSimulationSchedule = 0;
+    uint64_t simulationGeneration = 0;
+    uint64_t simulationRequests = 0;
+    uint64_t simulationCoalesced = 0;
+    uint64_t simulationCompleted = 0;
+    uint64_t simulationDiscarded = 0;
+    SimulationBackendPolicy simulationBackendPolicy =
+      SimulationBackendPolicy::AUTO_DEXEL;
+    SimulationBackend lastSimulationBackend = SimulationBackend::FULL_MC;
+    bool simulationBackendResolved = false;
+    bool simulationBackendFallback = false;
+    std::set<int> disabledSimulationTools;
+    unsigned machineConstraintWarnings = 0;
+    QString machineConstraintSummary;
     unsigned programLine    = 0;
     std::string programFile;
 
@@ -146,6 +173,8 @@ namespace CAMotics {
 
     void setAutoPlay(bool x = true) {autoPlay = x;}
     void setAutoClose(bool x = true) {autoClose = x;}
+    void setAutoCloseAfterSimulation(bool x = true)
+    {autoCloseAfterSimulation = x;}
 
     void init();
     void show();
@@ -159,6 +188,9 @@ namespace CAMotics {
 
     void loadMachine(const std::string &machine);
     void loadMachines();
+    void setReferenceFrame(View::ReferenceFrame frame);
+    void setSimulationToolEnabled(unsigned tool, bool enabled);
+    void togglePlayback();
     void loadDefaultExample();
     void loadExamples();
     void loadRecentProjects();
@@ -182,10 +214,16 @@ namespace CAMotics {
 
     void loadToolPath(const cb::SmartPointer<GCode::ToolPath> &toolPath,
                       bool simulate);
+    cb::SmartPointer<GCode::ToolPath> makeSimulationToolPath() const;
+    void validateMachinePath(const GCode::ToolPath &toolPath);
     void uploadGCode();
 
     void toolPathComplete(ToolPathTask &task);
     void surfaceComplete(SurfaceTask &task);
+    bool seekNextSimulationTestPosition();
+    bool injectSimulationTestSeekBurst();
+    void runViewControlsTest();
+    bool runDexelGridWindowTest();
     void reduceComplete(ReduceTask &task);
     void optimizeComplete(Opt &task);
 
@@ -196,6 +234,9 @@ namespace CAMotics {
     void optimize();
     void redraw(bool now = false);
     void snapshot();
+    void showDexelHeightMap();
+    void updateDexelHeightMapWindow();
+    void clearDexelHeightMapWindow(const QString &status);
     void exportData();
 
     bool runNewProjectDialog();
@@ -248,6 +289,7 @@ namespace CAMotics {
     void updateWorkpieceBounds();
 
     bool isActive() {return lastStatusActive;}
+    void updateStatusDisplay(bool active);
     void setStatusActive(bool active);
 
     void showConsole();
@@ -327,6 +369,7 @@ namespace CAMotics {
 
     void on_toolTableListView_activated(const QModelIndex &index);
     void on_toolTableListView_customContextMenuRequested(QPoint point);
+    void onToolTableItemChanged(QStandardItem *item);
 
     void on_automaticCuboidRadioButton_clicked();
     void on_marginDoubleSpinBox_valueChanged(double value);
@@ -358,6 +401,11 @@ namespace CAMotics {
     void on_actionPlay_triggered();
     void on_actionFaster_triggered();
     void on_actionDirection_triggered();
+    void on_actionSimulationEnd_triggered();
+    void on_actionStockFrame_triggered()
+    {setReferenceFrame(View::STOCK_FRAME);}
+    void on_actionToolFrame_triggered()
+    {setReferenceFrame(View::TOOL_FRAME);}
 
     void on_actionExportToolTable_triggered() {exportToolTable();}
     void on_actionImportToolTable_triggered() {importToolTable();}
@@ -367,6 +415,7 @@ namespace CAMotics {
     void on_actionSettings_triggered();
     void on_actionExport_triggered() {exportData();}
     void on_actionSnapshot_triggered() {snapshot();}
+    void on_actionDexelHeightMap_triggered() {showDexelHeightMap();}
     void on_actionConnect_triggered(bool checked);
 
     void on_actionFullscreen_triggered(bool checked);

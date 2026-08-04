@@ -29,8 +29,13 @@
 #include <cbang/log/Logger.h>
 
 #include <QGLFormat>
+#include <QGestureEvent>
+#include <QKeyEvent>
 #include <QMessageBox>
 #include <QOpenGLDebugLogger>
+#include <QPinchGesture>
+
+#include <cmath>
 
 using namespace CAMotics;
 using namespace cb;
@@ -46,6 +51,11 @@ GLView::GLView(QWidget *parent) : QOpenGLWidget(parent), enabled(true) {
 #endif // DEBUG
 
   setFormat(format);
+  setFocusPolicy(Qt::StrongFocus);
+  grabGesture(Qt::PinchGesture);
+  setToolTip(tr("Space: play/pause. Trackpad: two-finger pan; pinch or "
+                "Ctrl+two-finger scroll to zoom; Alt+two-finger scroll to "
+                "orbit. Mouse: left-drag orbit, middle-drag pan, wheel zoom."));
 }
 
 
@@ -63,7 +73,44 @@ View &GLView::getView() const {return getQtWin().getView();}
 void GLView::redraw(bool now) {getQtWin().redraw(now);}
 
 
+bool GLView::event(QEvent *event) {
+  if (event->type() == QEvent::Gesture) {
+    QGestureEvent *gestureEvent = static_cast<QGestureEvent *>(event);
+    QPinchGesture *pinch = static_cast<QPinchGesture *>
+      (gestureEvent->gesture(Qt::PinchGesture));
+    if (pinch) {
+      if (pinch->state() == Qt::GestureStarted) pinchScale = 1;
+      double scale = pinch->totalScaleFactor();
+      if (0 < scale && scale != pinchScale) {
+        getView().zoomBy(scale / pinchScale);
+        pinchScale = scale;
+        redraw(true);
+      }
+      if (pinch->state() == Qt::GestureFinished ||
+          pinch->state() == Qt::GestureCanceled)
+        pinchScale = 1;
+      gestureEvent->accept(pinch);
+      return true;
+    }
+  }
+
+  return QOpenGLWidget::event(event);
+}
+
+
+void GLView::keyPressEvent(QKeyEvent *event) {
+  if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+    getQtWin().togglePlayback();
+    event->accept();
+    return;
+  }
+
+  QOpenGLWidget::keyPressEvent(event);
+}
+
+
 void GLView::mousePressEvent(QMouseEvent *event) {
+  setFocus(Qt::MouseFocusReason);
   if (event->buttons() & Qt::LeftButton)
     getView().startRotation(event->x(), event->y());
 
@@ -95,8 +142,32 @@ void GLView::mouseMoveEvent(QMouseEvent *event) {
 
 
 void GLView::wheelEvent(QWheelEvent *event) {
-  if (event->delta() < 0) getView().zoomIn();
-  else getView().zoomOut();
+  const QPoint pixelDelta = event->pixelDelta();
+  const bool precisionScroll = !pixelDelta.isNull() ||
+    event->phase() != Qt::NoScrollPhase;
+
+  if (precisionScroll) {
+    QPoint delta = pixelDelta.isNull() ? event->angleDelta() / 8 : pixelDelta;
+    double x = delta.x();
+    double y = delta.y();
+
+    if (event->modifiers() & Qt::AltModifier)
+      getView().orbitByPixels(x, -y);
+    else if (event->modifiers() & Qt::ControlModifier)
+      getView().zoomBy(std::exp(y * 0.003));
+    else {
+      if ((event->modifiers() & Qt::ShiftModifier) && !x) {
+        x = y;
+        y = 0;
+      }
+      getView().panByPixels(x, y);
+    }
+
+    event->accept();
+  } else {
+    if (event->angleDelta().y() < 0) getView().zoomIn();
+    else getView().zoomOut();
+  }
 
   redraw(true);
 }

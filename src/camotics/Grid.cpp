@@ -89,15 +89,17 @@ pair<Grid, Grid> Grid::split(unsigned axis) const {
 
   if (steps[axis] < 2) return result;
 
-  // Left
-  Vector3U stepOffset;
-  stepOffset[axis] = steps[axis] / 2;
-  result.first = Grid(offset, steps - stepOffset, resolution);
+  // Split cell ownership without overlap; partitions may sample boundary
+  // vertices without rendering duplicate cells.
+  Vector3U rightOffset;
+  rightOffset[axis] = steps[axis] / 2;
 
-  // Right
-  Vector3D rOffset(offset + (Vector3D)stepOffset * resolution);
-  stepOffset = steps - result.first.getSteps();
-  result.second = Grid(rOffset, steps - stepOffset, resolution);
+  Vector3U leftSteps(steps);
+  leftSteps[axis] = rightOffset[axis];
+  result.first = Grid(offset, leftSteps, resolution);
+
+  Vector3D rOffset(offset + (Vector3D)rightOffset * resolution);
+  result.second = Grid(rOffset, steps - rightOffset, resolution);
 
   return result;
 }

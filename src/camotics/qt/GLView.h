@@ -46,6 +46,7 @@ namespace CAMotics {
     int xPicking = 0;
     int yPicking = 0;
     unsigned selectedMove = 0;
+    double pinchScale = 1;
 
   public:
     GLView(QWidget *parent = 0);
@@ -59,6 +60,8 @@ namespace CAMotics {
 
   protected:
     // From QWidget
+    bool event(QEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;

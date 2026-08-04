@@ -26,6 +26,7 @@
 
 
 namespace CAMotics {
+  struct ContourTriangleProvenance;
   class GridTreeLeaf;
 
   class GridTreeBase {
@@ -36,7 +37,8 @@ namespace CAMotics {
     virtual unsigned getCount() const = 0;
     virtual void insertLeaf(GridTreeLeaf *leaf, const cb::Vector3U &steps,
                             const cb::Vector3U &offset) {}
-    virtual void gather(std::vector<float> &vertices,
-                        std::vector<float> &normals) const = 0;
+    virtual void gather
+    (std::vector<float> &vertices, std::vector<float> &normals,
+     std::vector<ContourTriangleProvenance> *provenance = 0) const = 0;
   };
 }

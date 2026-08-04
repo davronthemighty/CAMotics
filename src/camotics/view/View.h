@@ -27,6 +27,7 @@
 #include "GLBox.h"
 #include "ToolView.h"
 #include "Mesh.h"
+#include "DexelMesh.h"
 #include "MachineView.h"
 #include "AABBView.h"
 
@@ -56,12 +57,18 @@ namespace CAMotics {
     double lastTime = 0;
 
   public:
+    enum ReferenceFrame {
+      STOCK_FRAME,
+      TOOL_FRAME,
+    };
+
     cb::SmartPointer<GLObject> axes;
     cb::SmartPointer<GLBox> bounds;
     cb::SmartPointer<ToolPathView> path;
     cb::SmartPointer<ToolView> tool;
     cb::SmartPointer<CuboidView> workpiece;
     cb::SmartPointer<Mesh> model;
+    cb::SmartPointer<DexelMesh> dexelModel;
     cb::SmartPointer<Lines> wireModel;
     cb::SmartPointer<Surface> surface;
     cb::SmartPointer<MoveLookup> moveLookup;
@@ -75,6 +82,7 @@ namespace CAMotics {
     bool surfaceChanged = false;
     bool machineChanged = false;
     bool moveLookupChanged = false;
+    ReferenceFrame referenceFrame = STOCK_FRAME;
 
     enum {
       WIRE_FLAG                  = 1 << 0,
@@ -105,8 +113,14 @@ namespace CAMotics {
     void setSpeed(unsigned speed) {this->speed = speed;}
     void incSpeed();
     void decSpeed();
+    bool isReverse() const {return reverse;}
     void setReverse(bool reverse) {this->reverse = reverse;}
     void changeDirection() {reverse = !reverse; values.updated();}
+    ReferenceFrame getReferenceFrame() const {return referenceFrame;}
+    void setReferenceFrame(ReferenceFrame frame)
+    {referenceFrame = frame; values.updated();}
+    const char *getReferenceFrameName() const
+    {return referenceFrame == TOOL_FRAME ? "Tool frame" : "Stock frame";}
 
     void setToolPath(const cb::SmartPointer<GCode::ToolPath> &toolPath);
     void setWorkpiece(const cb::Rectangle3D &bounds);

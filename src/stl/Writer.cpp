@@ -21,8 +21,6 @@
 #include "Writer.h"
 #include "BinaryTriangle.h"
 
-#include <cstring>
-
 using namespace std;
 using namespace cb;
 using namespace STL;
@@ -32,10 +30,9 @@ void Writer::writeHeader(const string &name, uint32_t count,
                          const string &hash) {
   if (binary) {
     // Header
-    char header[81];
-    memset(header, 0, 81);
-    if (!hash.empty()) memcpy(header, hash.c_str(), 80);
-    stream.write(header, 80);
+    char header[80] = {};
+    if (!hash.empty()) hash.copy(header, sizeof(header));
+    stream.write(header, sizeof(header));
 
     // Count
     stream.write((char *)&count, 4);

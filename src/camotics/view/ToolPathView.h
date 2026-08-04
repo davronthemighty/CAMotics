@@ -30,6 +30,7 @@
 #include <cbang/SmartPointer.h>
 
 #include <vector>
+#include <set>
 #include <cinttypes>
 
 
@@ -51,6 +52,14 @@ namespace CAMotics {
 
     bool dirty = true;
     bool showIntensity = false;
+    bool fastPlayback = false;
+    bool pathBuffersLoaded = false;
+    std::set<int> disabledTools;
+    std::vector<double> prefixDistance;
+    std::vector<unsigned> moveVertexOffsets;
+    unsigned playbackFirstVertex = 0;
+    unsigned playbackNumVertices = 0;
+    bool playbackWindowLogged = false;
 
     std::vector<float> vertices;
     std::vector<float> colors;
@@ -87,6 +96,7 @@ namespace CAMotics {
     bool atEnd() const {return getTime() == getTotalTime();}
     double getRemainingTime() const {return getTotalTime() - time;}
     double getTotalTime() const {return path.isNull() ? 0 : path->getTime();}
+    double getRequestedTimeRatio() const {return ratio;}
     double getTimeRatio() const {return time / getTotalTime();}
     double getPercentTime() const {return getTimeRatio() * 100;}
 
@@ -104,6 +114,8 @@ namespace CAMotics {
     const GCode::Move &getMove() const {return move;}
 
     void setShowIntensity(bool show);
+    void setFastPlayback(bool fast);
+    void setDisabledTools(const std::set<int> &tools);
 
     unsigned getTool()  const {return move.getTool();}
     double   getFeed()  const {return move.getFeed();}
@@ -129,6 +141,7 @@ namespace CAMotics {
     void glDraw(GLContext &gl) override;
 
   protected:
+    void updatePlaybackPosition();
     void pushVertex(const cb::Vector3D &v, const Color &color, unsigned index);
   };
 }

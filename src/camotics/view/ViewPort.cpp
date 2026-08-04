@@ -22,6 +22,9 @@
 
 #include <cbang/log/Logger.h>
 
+#include <algorithm>
+#include <cmath>
+
 using namespace std;
 using namespace cb;
 using namespace CAMotics;
@@ -32,6 +35,12 @@ ViewPort::ViewPort() {resetView();}
 
 void ViewPort::zoomIn() {if (0.2 < getZoom()) setZoom(getZoom() * 0.9);}
 void ViewPort::zoomOut() {if (getZoom() < 30) setZoom(getZoom() * 1.1);}
+
+
+void ViewPort::zoomBy(double factor) {
+  if (!std::isfinite(factor) || factor <= 0) return;
+  setZoom(std::max(0.2, std::min(30.0, getZoom() * factor)));
+}
 
 
 void ViewPort::center() {
@@ -89,6 +98,22 @@ void ViewPort::startTranslation(int x, int y) {
 void ViewPort::updateTranslation(int x, int y) {
   setTranslation(translationStart + (Vector2D(x, -y) - translationStartPt)
                  / Vector2D(getWidth(), getHeight()));
+}
+
+
+void ViewPort::panByPixels(double x, double y) {
+  if (!getWidth() || !getHeight()) return;
+  setTranslation(getTranslation() +
+                 Vector2D(x / getWidth(), y / getHeight()));
+}
+
+
+void ViewPort::orbitByPixels(double x, double y) {
+  if (!getWidth() || !getHeight()) return;
+  int centerX = getWidth() / 2;
+  int centerY = getHeight() / 2;
+  startRotation(centerX, centerY);
+  updateRotation(centerX + std::lround(x), centerY + std::lround(y));
 }
 
 

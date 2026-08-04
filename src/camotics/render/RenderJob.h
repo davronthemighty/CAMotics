@@ -29,20 +29,49 @@
 #include <cbang/thread/Thread.h>
 #include <cbang/thread/Condition.h>
 
+#include <cstdint>
+
 
 namespace CAMotics {
+  struct RenderStats {
+    uint64_t cellsVisited = 0;
+    uint64_t cellsCulled = 0;
+    uint64_t cellsContoured = 0;
+    uint64_t triangles = 0;
+    uint64_t vertexSamples = 0;
+    uint64_t depthCalls = 0;
+    uint64_t toolsweepDepthCalls = 0;
+    uint64_t edgeChecks = 0;
+    uint64_t edgeIntersections = 0;
+
+    void add(const RenderStats &o) {
+      cellsVisited += o.cellsVisited;
+      cellsCulled += o.cellsCulled;
+      cellsContoured += o.cellsContoured;
+      triangles += o.triangles;
+      vertexSamples += o.vertexSamples;
+      depthCalls += o.depthCalls;
+      toolsweepDepthCalls += o.toolsweepDepthCalls;
+      edgeChecks += o.edgeChecks;
+      edgeIntersections += o.edgeIntersections;
+    }
+  };
+
+
   class RenderJob : public cb::Thread {
     cb::Condition &condition;
     cb::SmartPointer<ContourGenerator> generator;
 
     FieldFunction &func;
-    GridTreeRef &tree;
+    GridTreeRef tree;
+    RenderStats stats;
 
   public:
     RenderJob(cb::Condition &condition, FieldFunction &func, RenderMode mode,
-              GridTreeRef &tree);
+              const GridTreeRef &tree);
 
     double getProgress() {return generator->getProgress();}
+    const RenderStats &getStats() const {return stats;}
 
     // From Thread
     void run() override;

@@ -57,6 +57,7 @@ void Task::begin(const string &status) {
   this->status = status;
   progress = eta = 0;
   startTime = endTime = Timer::now();
+  updated(status, 0);
 }
 
 

@@ -25,6 +25,7 @@
 #include "GradientBackground.h"
 
 #include <camotics/sim/MoveLookup.h>
+#include <camotics/sim/DexelSimulation.h>
 
 #include <gcode/ToolTable.h>
 
@@ -33,6 +34,8 @@
 #include <cbang/util/HumanNumber.h>
 #include <cbang/log/Logger.h>
 #include <cbang/config/Options.h>
+
+#include <limits>
 
 using namespace std;
 using namespace cb;
@@ -141,6 +144,9 @@ void View::clear() {
 
 void View::updateVisibility() {
   bool wire = isFlagSet(View::WIRE_FLAG);
+  Dexel::GridSurface *grid = surface.isSet() ?
+    dynamic_cast<Dexel::GridSurface *>(surface.get()) : 0;
+  bool direct = grid && grid->isDirect();
 
   axes->setVisible(isFlagSet(View::SHOW_AXES_FLAG));
   bounds->setVisible(!isFlagSet(View::SHOW_WORKPIECE_FLAG) &&
@@ -148,9 +154,16 @@ void View::updateVisibility() {
   tool->setVisible(isFlagSet(View::SHOW_TOOL_FLAG) && !path->isEmpty());
   path->setShowIntensity(isFlagSet(View::PATH_INTENSITY_FLAG));
   path->setVisible(isFlagSet(View::SHOW_PATH_FLAG));
-  model->setVisible(isFlagSet(View::SHOW_SURFACE_FLAG) && !wire);
+  model->setVisible(isFlagSet(View::SHOW_SURFACE_FLAG) && !wire && !direct);
+  dexelModel->setVisible
+    (isFlagSet(View::SHOW_SURFACE_FLAG) && !wire && direct);
   wireModel->setVisible(isFlagSet(View::SHOW_SURFACE_FLAG) && wire);
-  workpiece->setVisible(isFlagSet(View::SHOW_WORKPIECE_FLAG));
+  // Keep an uncut stock visible while Play waits for its first exact retained
+  // state.  The normal cut-surface control still governs this placeholder.
+  bool playbackPlaceholder = isFlagSet(View::PLAY_FLAG) && surface.isNull() &&
+    isFlagSet(View::SHOW_SURFACE_FLAG);
+  workpiece->setVisible(isFlagSet(View::SHOW_WORKPIECE_FLAG) ||
+                        playbackPlaceholder);
   machineView->setVisible(isFlagSet(View::SHOW_MACHINE_FLAG));
   machineView->setWire(wire);
   aabbView->setVisible(isFlagSet(View::SHOW_BBTREE_FLAG));
@@ -176,7 +189,9 @@ void View::updateBounds() {
 
   // Setup view
   GLScene::setViewBounds(bbox);
-  GLScene::setViewCenter(workpieceBounds.getCenter());
+  if (referenceFrame == TOOL_FRAME && path.isSet() && !path->isEmpty())
+    GLScene::setViewCenter(path->getPosition());
+  else GLScene::setViewCenter(workpieceBounds.getCenter());
 }
 
 
@@ -201,15 +216,21 @@ void View::updateTool() {
 
 
 void View::loadWireModel() {
-  wireModel->reset(surface->getTriangleCount() * 3, false, true);
+  const uint64_t surfaceTriangles = surface->getTriangleCount();
+  const uint64_t maxTriangles =
+    numeric_limits<unsigned>::max() / (18 * sizeof(float));
+  if (maxTriangles < surfaceTriangles)
+    THROW("Surface is too large for the wireframe display");
+  wireModel->reset((unsigned)surfaceTriangles * 3, false, true);
 
   auto cb =
     [this] (const vector<float> &vertices, const vector<float> &normals) {
-      unsigned triangles = vertices.size() / 9;
+      size_t triangles = vertices.size() / 9;
+      if (!triangles) return;
       vector<float> v(triangles * 18);
       vector<float> n(triangles * 18);
 
-      for (unsigned i = 0; i < triangles; i++)
+      for (size_t i = 0; i < triangles; i++)
         for (unsigned j = 0; j < 2; j++) {
           const float *t = j ? &normals[i * 9] : &vertices[i * 9];
           vector<float> &out = j ? n : v;
@@ -223,7 +244,7 @@ void View::loadWireModel() {
           memcpy(&out[i * 18 + 15], v0, sizeof(float) * 3);
         }
 
-      wireModel->add(triangles * 6, &v[0], 0, &n[0]);
+      wireModel->add((unsigned)triangles * 6, &v[0], 0, &n[0]);
     };
 
   surface->getVertices(cb);
@@ -235,6 +256,7 @@ void View::updateModel() {
   // Color
   const float alpha = isFlagSet(View::TRANSLUCENT_SURFACE_FLAG) ? 0.5f : 1.0f;
   model->getColor().setAlpha(alpha);
+  dexelModel->getColor().setAlpha(alpha);
 
   bool wire = isFlagSet(View::WIRE_FLAG);
 
@@ -243,17 +265,29 @@ void View::updateModel() {
     wireModel->reset(0, false, false);
 
     if (surface.isSet()) {
-      model->reset(surface->getTriangleCount());
+      Dexel::GridSurface *grid =
+        dynamic_cast<Dexel::GridSurface *>(surface.get());
+      if (grid && grid->isDirect()) {
+        model->reset(0);
+        dexelModel->load(*grid);
+        dexelModel->setVisible(!wire);
+      } else {
+        dexelModel->clear();
+        model->reset(surface->getTriangleCount());
 
-      auto cb =
-        [this] (const vector<float> &vertices, const vector<float> &normals) {
-          model->add(vertices, normals);
-        };
+        auto cb =
+          [this] (const vector<float> &vertices, const vector<float> &normals) {
+            model->add(vertices, normals);
+          };
 
-      surface->getVertices(cb);
-      model->setVisible(!wire);
+        surface->getVertices(cb);
+        model->setVisible(!wire);
+      }
 
-    } else model->reset(0);
+    } else {
+      model->reset(0);
+      dexelModel->clear();
+    }
   }
 
   if (surface.isSet() && wire && wireModel->empty()) loadWireModel();
@@ -305,6 +339,7 @@ void View::glInit() {
   group->add(path);
   group->add(aabbView);
   group->add(model = new Mesh(0));
+  group->add(dexelModel = new DexelMesh);
   group->add(wireModel = new Lines(0, false, false));
   group->add(workpiece = new CuboidView);
   group->add(tool = new ToolView); // Last for transparency
@@ -313,6 +348,7 @@ void View::glInit() {
   // Colors
   Color modelColor(0.06, 0.23, 0.42);
   model->setColor(modelColor);
+  dexelModel->setColor(modelColor);
   wireModel->setColor(modelColor);
   workpiece->setColor(modelColor);
   bounds->setColor(1, 1, 1, 0.5); // White
@@ -320,9 +356,11 @@ void View::glInit() {
 
 
 void View::glDraw(bool picking) {
+  path->setFastPlayback(isFlagSet(PLAY_FLAG));
+  path->update();
   updateVisibility();
   updateBounds();
-  path->update();
+  dexelModel->setPlayback(isFlagSet(PLAY_FLAG), speed);
   updateTool();
   updateModel();
   updateMachine();

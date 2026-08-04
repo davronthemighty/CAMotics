@@ -37,6 +37,7 @@ namespace CAMotics {
     unsigned get();
     void allocate(unsigned size);
     void add(unsigned count, const float *data);
+    void update(unsigned offset, unsigned count, const float *data);
     void enable(unsigned stride);
     void disable();
   };

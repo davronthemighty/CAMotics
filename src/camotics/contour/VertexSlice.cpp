@@ -20,6 +20,8 @@
 
 #include "VertexSlice.h"
 
+#include <camotics/Profile.h>
+
 #include <limits>
 
 using namespace std;
@@ -46,7 +48,12 @@ void VertexSlice::compute(FieldFunction &func) {
     for (unsigned y = 0; y <= steps.y(); y++) {
       p.y() = grid.getOffset().y() + resolution * y;
 
-      if (!func.cull(p, 2.1 * resolution)) at(x).at(y) = func.depth(p);
+      Profile::count(ProfileCounter::VERTEX_SAMPLES);
+      if (!func.cull(p, 2.1 * resolution)) {
+        Profile::count(ProfileCounter::DEPTH_CALLS);
+        at(x).at(y) = func.depth(p);
+
+      } else Profile::count(ProfileCounter::VERTEX_CULLED);
     }
   }
 }

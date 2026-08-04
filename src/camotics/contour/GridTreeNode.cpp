@@ -91,8 +91,9 @@ void GridTreeNode::insertLeaf(GridTreeLeaf *leaf, const Vector3U &_steps,
 }
 
 
-void GridTreeNode::gather(vector<float> &vertices,
-                          vector<float> &normals) const {
-  if (left) left->gather(vertices, normals);
-  if (right) right->gather(vertices, normals);
+void GridTreeNode::gather(vector<float> &vertices, vector<float> &normals,
+                          vector<ContourTriangleProvenance> *provenance)
+  const {
+  if (left) left->gather(vertices, normals, provenance);
+  if (right) right->gather(vertices, normals, provenance);
 }

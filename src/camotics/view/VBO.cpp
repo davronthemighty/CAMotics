@@ -65,6 +65,18 @@ void VBO::add(unsigned count, const float *data) {
 }
 
 
+void VBO::update(unsigned offset, unsigned count, const float *data) {
+  unsigned bytes = count * sizeof(float);
+  if (size < offset + bytes)
+    THROW("VBO update overflow " << size << " < " << offset + bytes);
+
+  GLContext gl;
+  gl.glBindBuffer(GL_ARRAY_BUFFER, get());
+  gl.glBufferSubData(GL_ARRAY_BUFFER, offset, bytes, data);
+  gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
 void VBO::enable(unsigned stride) {
   GLContext gl;
 

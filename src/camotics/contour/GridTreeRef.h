@@ -28,17 +28,20 @@ namespace CAMotics {
   class GridTreeRef : public GridTreeBase, public Grid {
     GridTree *ref;
     cb::Vector3U offset;
+    cb::Vector3U provenanceOffset;
 
   public:
     GridTreeRef(GridTree *ref, const cb::Vector3U &offset,
-                const cb::Vector3U &steps);
+                const cb::Vector3U &steps,
+                const cb::Vector3U &provenanceOffset);
 
     using GridTreeBase::insertLeaf;
     void insertLeaf(GridTreeLeaf *leaf, const cb::Vector3U &offset);
 
     // From GridTreeBase
     unsigned getCount() const override;
-    void gather(std::vector<float> &vertices,
-                std::vector<float> &normals) const override;
+    void gather(std::vector<float> &vertices, std::vector<float> &normals,
+                std::vector<ContourTriangleProvenance> *provenance = 0)
+      const override;
   };
 }

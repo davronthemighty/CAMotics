@@ -196,6 +196,39 @@
             </item>
            </layout>
           </item>
+          <item>
+           <layout class="QHBoxLayout" name="simulationBackendLayout">
+            <item>
+             <widget class="QLabel" name="simulationBackendLabel">
+              <property name="font">
+               <font>
+                <underline>true</underline>
+               </font>
+              </property>
+              <property name="text">
+               <string>Simulation backend</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="simulationBackendComboBox">
+              <property name="toolTip">
+               <string>Auto uses the fast dexel simulator when its strict safety checks pass, otherwise it uses full marching cubes.</string>
+              </property>
+              <item>
+               <property name="text">
+                <string>Full marching cubes (reference)</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Auto (fast dexel when safe)</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+           </layout>
+          </item>
          </layout>
         </widget>
        </item>

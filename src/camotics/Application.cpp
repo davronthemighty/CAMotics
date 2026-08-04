@@ -25,6 +25,8 @@
 #include <cbang/log/Logger.h>
 #include <cbang/os/SystemUtilities.h>
 
+#include <cstdlib>
+
 using namespace std;
 using namespace CAMotics;
 
@@ -58,7 +60,9 @@ Application::Application(const string &name, hasFeature_t hasFeature) :
   if (hasFeature(FEATURE_INFO)) {
     cb::Info::instance().add(name, true);
     BuildInfo::addBuildInfo(name.c_str());
-    setVersion(cb::Info::instance().get(name, "Version"));
+    // Cbang's legacy Version fields are eight-bit values.  Keep them nonzero
+    // so its initializer does not parse the calendar version from BuildInfo.
+    setVersion(cb::Version(1, 0, 0));
   }
 
   cmdLine.setShowKeywordOpts(false);
@@ -69,4 +73,13 @@ void Application::run() {
   auto &args = cmdLine.getPositionalArgs();
   if (args.empty()) read(cin);
   for (auto &arg: args) read(cb::InputSource::open(arg));
+}
+
+
+int Application::versionAction() {
+  const cb::Info &info = cb::Info::instance();
+  if (info.has(name, "Version")) LOG_RAW(info.get(name, "Version"));
+  else LOG_RAW(getVersion());
+  std::exit(EXIT_SUCCESS);
+  return -1;
 }

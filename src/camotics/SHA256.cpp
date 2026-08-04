@@ -134,9 +134,9 @@ void SHA256::finalize(uint8_t hash[32]) {
 
 
 string SHA256::finalize() {
-  uint8_t hash[32];
+  uint8_t hash[32] = {};
   finalize(hash);
-  return string((char *)hash, 32);
+  return string(reinterpret_cast<char *>(hash), 32);
 }
 
 

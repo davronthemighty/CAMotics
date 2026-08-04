@@ -42,6 +42,35 @@ void ConicSweep::getBBoxes(const Vector3D &start, const Vector3D &end,
 }
 
 
+void ConicSweep::getBBoxesForQuery(const Vector3D &start,
+                                   const Vector3D &end,
+                                   const Rectangle3D &queryBounds,
+                                   vector<Rectangle3D> &bboxes,
+                                   double tolerance) const {
+  double moveMinZ = min(start.z(), end.z());
+  double moveMaxZ = max(start.z(), end.z());
+  double queryMinZ = queryBounds.getMin().z() - tolerance;
+  double queryMaxZ = queryBounds.getMax().z() + tolerance;
+
+  double possibleMinHeight = queryMinZ - moveMaxZ;
+  double possibleMaxHeight = queryMaxZ - moveMinZ;
+  if (possibleMaxHeight < 0 || l < possibleMinHeight) return;
+
+  double h0 = max(0.0, possibleMinHeight);
+  double h1 = min(l, possibleMaxHeight);
+  double r0 = rb + Tm * h0;
+  double r1 = rb + Tm * h1;
+  double boundedRadius = max(r0, r1);
+  double fullRadius = max(rb, rt);
+
+  // Keep the legacy full-radius subdivision count while tightening only the
+  // conservative XY expansion.  This avoids introducing duplicate move
+  // candidates merely because the query slab intersects a narrow cone slice.
+  Sweep::getBBoxes(start, end, bboxes, boundedRadius, l, 0, tolerance,
+                   fullRadius);
+}
+
+
 namespace {
   inline double sqr(double x) {return x * x;}
 }

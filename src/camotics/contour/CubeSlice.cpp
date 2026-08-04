@@ -20,6 +20,8 @@
 
 #include "CubeSlice.h"
 
+#include <camotics/Profile.h>
+
 #include <cbang/log/Logger.h>
 
 using namespace std;
@@ -77,11 +79,15 @@ void CubeSlice::compute(Task &task, FieldFunction &func) {
         if (x == steps.x() && (i == 0 || i == 3)) continue;
         if (y == steps.y() && (i == 1 || i == 4)) continue;
 
+        Profile::count(ProfileCounter::EDGE_CHECKS);
+
         Vector3D b = p + offsets[i];
         double bDepth = depth(x, y, vIndex[i]);
 
-        if ((aDepth < 0) != (bDepth < 0) && !cull)
+        if ((aDepth < 0) != (bDepth < 0) && !cull) {
+          Profile::count(ProfileCounter::EDGE_INTERSECTIONS);
           edges[i][x][y] = func.getEdge(a, aDepth, b, bDepth);
+        }
 
         if (i == 2) {
           a = b;
